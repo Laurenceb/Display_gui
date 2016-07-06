@@ -23,6 +23,7 @@ QObject(parent)
 	SP1MLnetworkaddress=LOWEST_ADDRESS-1;//First device connects at this address. The address is incremented with each subsequenct connection
 	connection=false;
 	operatingmode=0;		//Normal mode
+    cable_capacitance=CABLE_CAPACITANCE;
 	state=INIT_STATE_SP1ML;		//The initial "parking" state
 	latestdatasample.channelmask=0x00FF;//Initialise with all the ECG channels enabled
 	for(qint8 n=0; n<8; n++)
