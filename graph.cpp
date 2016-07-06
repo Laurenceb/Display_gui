@@ -413,19 +413,19 @@ void Graph::addData(datasample_t* datasamp) {
     ++frameCount;
     if (key-lastFpsKey > 2) // average fps over 2 seconds
     {
-      if(percent_charged>=0)
+      if(percent_charged<0) {
       bar_->showMessage(
           QString("%1 FPS, Total Data points: %2")
           .arg(frameCount/(key-lastFpsKey), 0, 'f', 0)
           .arg(customPlot_->graph(0)->data()->count()+customPlot_->graph(1)->data()->count())
-          , 0);
-      else
+          , 0); }
+      else {
       bar_->showMessage(
-          QString("%1 FPS, Total Data points: %2, Battery: %3%%")
+          QString("%1 FPS, Total Data points: %2, Battery: %3%")
           .arg(frameCount/(key-lastFpsKey), 0, 'f', 0)
           .arg(customPlot_->graph(0)->data()->count()+customPlot_->graph(1)->data()->count())
           .arg(percent_charged)
-          , 0);
+          , 0); }
       lastFpsKey = key;
       frameCount = 0;
     }
