@@ -31,8 +31,8 @@ QObject(parent)
 }		
 
 void connectionManager::connectionStateMachine() {
-	static QByteArray transmitbuffer,receivebuffer;//Used to hold commands sent to the serial port
-	static int internaltimeout;
+    static QByteArray transmitbuffer,receivebuffer;//Used to hold commands sent to the serial port
+    static int internaltimeout;
 	static double internaltimestamp;
 	static double timelastpacket;		//The time we connected (is part of the class). This is the time of the last packet
 	double secondsSinceEpoch=QDateTime::currentDateTime().toMSecsSinceEpoch()/1000.0;
@@ -40,7 +40,7 @@ void connectionManager::connectionStateMachine() {
 	static qint32 qualityfilter_demod[8][10][2]={};//Used for I,Q filter history
 	static quint32 qualityfilter[8]={};	//Used for low pass magnitude filtering of 62.5Hz bandpass output
 	QByteArray readpacket;
-	switch(state) {
+    switch(state) {
 	case INIT_STATE_SP1ML:			//Init state for SP1ML module configuration
 		if(!connection)
 			break;
@@ -172,6 +172,7 @@ void connectionManager::connectionStateMachine() {
 			for(qint16 n=0; n<16; n++) {		//There are a maximum of 16 channels supported by the protocol
 				if((indx+1)>=readpacket.size()) {
 					historybufferr=1;	//Mark this as an error
+					//qDebug() << endl << readpacket.size() << indx;
 					break;			//This should not happen
 				}
 				if(latestdatasample.channelmask&(1<<n)) {//The current channel is enabled
@@ -227,9 +228,12 @@ void connectionManager::connectionStateMachine() {
 						latestdatasample.samples[n]=(readpacket[indx])||(readpacket[indx+1]<<8);
 					indx+=2;
 				}
-			}
-			if(!historybufferr)			//If we have good samples
+			}				
+			qDebug() << endl << "Received" << historybufferr;
+			if(!historybufferr) {			//If we have good samples
+				qDebug() << endl << "Received";
 				emit setDataToGraph(&latestdatasample);	//This is connected to the plotter
+			}
 		}
 		else if(secondsSinceEpoch>(timelastpacket+((secondsSinceEpoch<(connectiontime+TIMEOUT_TRANSITION))?TIMEOUT_ONE:TIMEOUT_TWO))) {
 			if(connectiontype==1)			//causes the connection state to be reset so that nopefully a new connection can be made
@@ -261,25 +265,33 @@ bool connectionManager::dataDepacket(QByteArray* data, int n, QByteArray* data_o
 	if(data->size()<4)
 		return false;	//Nothing useful in the buffer (yet)
 	int skip;		//The initial skip value (candidate, as we don't know if we have a complete packet yet - service name reply is of unknown length)
-	int index=data->indexOf(HEAD,1);//The next index
+	int index=data->indexOf(HEAD,1)-1;//The next index
 	int siz;
 	if(index<0)		//Nothing found
 		index=data->size()-1;//Go to the end of the string
 	siz=index;
 	*data_output=data->mid(0,siz);//Copy to the output, only the output is manipulated here
-	for(skip=1;skip<=siz;skip++)//Go through XORING, exclude the head byte, include the tail
+	//qDebug() << endl << (((*data_output))).toHex();
+	for(skip=1;skip<siz;skip++) {//Go through XORING, exclude the head byte, include the tail
 		((*data_output)[skip])=((*data_output)[skip])^HEAD;//Payload is XOR with head
+	}
+	//qDebug() << endl << "Received";
+	//qDebug() << endl << (((*data_output))).toHex();
+	index--;
 	while(index) {		//Start at the end of the packet and work in reverse, then remove the last byte, as its redundant, and return the payload
-		skip=(*data)[index];//Load the skip value
+		skip=(*data_output)[index];//Load the skip value
+		//qDebug() << endl << "Skip" << skip << index;
 		if(!skip) {
 			data_output->clear();
+			qDebug() << endl << "Skip error" << index << (*data_output)[0] << (*data_output)[1] <<  (*data_output)[2] <<  (*data_output)[3];
 			return false;
 		}
-		index-=skip;
 		if(index>0)
 			(*data_output)[index]=0x00;//Work backwards replacing bytes
+		index-=skip;
 		if( (index==0 && data->at(index)!=HEAD) || index<0 ) { //Neither of these two things should happen, if they do we aren't in a valid packet, so abort
 			data_output->clear();
+			qDebug() << endl << "Head error" << index << data_output->at(index);
 			return false;
 		}
 	}//Only one packet is extracted from the start
