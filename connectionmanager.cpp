@@ -154,31 +154,42 @@ void connectionManager::connectionStateMachine() {
 		qint16 count=0;
 		for(qint16 n=0;n<16;n++)
 			count+=(latestdatasample.channelmask&(1<<n))?1:0;
-		if(dataDepacket(&receivebuffer, count*2, &readpacket)) {//A packet was found, process it (count is number of channels, add two byte overhead)
+		quint8 foundapacket=0;
+		while(dataDepacket(&receivebuffer, count*2, &readpacket)) {//A packet was found, process it (count is number of channels, add two byte overhead)
+			foundapacket=1;
 			if(!connectiontype && !latestdatasample.device_scale_factor)
 				latestdatasample.device_scale_factor=ADC_SCALE_FACTOR/(float)readpacket[1];//Populate this using the first sequence number
 			double timegap=secondsSinceEpoch-timelastpacket;//This should be rounded to the nearest GUI refresh interval, also serial delay to consider
-			int gap=((int)(readpacket[1])-lastsequencenumber)%256;//Normally this should be 1, but if packets are missed it could be greater
+			int gap=((int)((quint8)readpacket[1])-lastsequencenumber);//Normally this should be 1, but if packets are missed it could be greater
+			if(gap<0)
+				gap+=256;
 			timelastpacket=secondsSinceEpoch;
-			lastsequencenumber=(int)(readpacket[1]);
+			lastsequencenumber=(int)((quint8)readpacket[1]);
 			int gapt=(int)(timegap*DATA_RATE);	//This is how many samples should have been dropped according to the time gap
 			gapt-=(gapt)%256; 			//This takes off the possible correction range that can be achieved using the sequence number
 			gap+=gapt;	
+			//if(!lastsequencenumber)
+			//	qDebug() << endl << "gap:" << gap;
 			currentestimateddevicetime+=(float)gap/DATA_RATE;//Add to the current estimated device time
 			//Load the data from the packet string into the sample history struct
 			qint16 tempbuf;				//Used as working buffer for ECG samples
 			qint16 indx=2;				//Starting index of the data (there is a network address and sequence number first)
 			qint8 historybufferr=0;
 			for(qint16 n=0; n<16; n++) {		//There are a maximum of 16 channels supported by the protocol
-				if((indx+1)>=readpacket.size()) {
-					historybufferr=1;	//Mark this as an error
-					//qDebug() << endl << readpacket.size() << indx;
-					break;			//This should not happen
-				}
 				if(latestdatasample.channelmask&(1<<n)) {//The current channel is enabled
+					if((indx+1)>=readpacket.size()) {
+						historybufferr=1;	//Mark this as an error
+						//qDebug() << endl << "indx" << indx << readpacket.size();
+						//qDebug() << endl << readpacket.size() << indx;
+						break;			//This should not happen
+					}
 					if(n<8) {		//If this is an ECG channel, run the filters to strip the ECG from the lead-off signal
-						tempbuf=(readpacket[indx])||((qint16)readpacket[indx+1]<<8);//The current sample
-						if((datasamplehist.indices[n][1]-(int)(readpacket[1]))%256==2) {//Normal packet spacing, everything is ok
+						tempbuf=(readpacket[indx])|((quint16)readpacket[indx+1]<<8);//The current sample
+						//qDebug() << endl << tempbuf ;
+						qint16 difference=(int)((quint8)(readpacket[1]))-datasamplehist.indices[n][1];
+						if(difference<0)
+							difference+=256;
+						if(difference==2) {//Normal packet spacing, everything is ok
 							bindex[n]++;
 							latestdatasample.samples[n]=(tempbuf+datasamplehist.samples[n][1])>>1;//comb block filt at 62.5hz
 							if(!(bindex[n]&0x03)) {//Generate an I and a Q value from the last 4 samples (they might not be sequential)
@@ -215,31 +226,38 @@ void connectionManager::connectionStateMachine() {
 							latestdatasample.rawquality[n]=latestdatasample.rawquality[n]*(1.0-GAIN_COEFFICIENT)+diff*GAIN_COEFFICIENT;
 							latestdatasample.quality[n]=CONVERT_GAIN*logf(latestdatasample.rawquality[n])+CONVERT_OFFSET;//display value
 						}
-						else
-							historybufferr=1;//There was a problem filtering the data due to missing packets
-						for(qint8 h=3; h; h++) {//Loop through the sample and index delay buffer
+						else {
+							historybufferr=2;//There was a problem filtering the data due to missing packets
+							//qDebug() << endl << "Missed packet" << n;
+							qDebug() << endl << abs((datasamplehist.indices[n][1]-(int)((quint8)(readpacket[1])))%256);
+						}
+						for(qint8 h=3; h; h--) {//Loop through the sample and index delay buffer
 							datasamplehist.samples[n][h]=datasamplehist.samples[n][h-1];//Shift the history buffer
 							datasamplehist.indices[n][h]=datasamplehist.indices[n][h-1];//Shift the indices buffer
 						}
 						datasamplehist.samples[n][0]=tempbuf;
-						datasamplehist.indices[n][0]=(int)(readpacket[1]);
+						datasamplehist.indices[n][0]=(int)((quint8)readpacket[1]);
 					}
 					else			//Load the sample from the byte array little-endian
 						latestdatasample.samples[n]=(readpacket[indx])||(readpacket[indx+1]<<8);
 					indx+=2;
 				}
 			}				
-			qDebug() << endl << "Received" << historybufferr;
 			if(!historybufferr) {			//If we have good samples
-				qDebug() << endl << "Received";
+				//qDebug() << endl << "Received";
+				latestdatasample.sampletime=currentestimateddevicetime;
 				emit setDataToGraph(&latestdatasample);	//This is connected to the plotter
 			}
+			else
+				qDebug() << endl << "Receive error" << historybufferr << "," << (int)(readpacket[1]);
 		}
-		else if(secondsSinceEpoch>(timelastpacket+((secondsSinceEpoch<(connectiontime+TIMEOUT_TRANSITION))?TIMEOUT_ONE:TIMEOUT_TWO))) {
-			if(connectiontype==1)			//causes the connection state to be reset so that nopefully a new connection can be made
-				state=INIT_STATE_SP1ML;		//A long interval with nothing found (about 2 minutes during runtime, and 10 seconds at boot)
-			else if(connectiontype==0)
-				state=ENTRY_STATE;		//A simple re-entry, no need to establish a new connection
+		if(!foundapacket) {
+			if(secondsSinceEpoch>(timelastpacket+((secondsSinceEpoch<(connectiontime+TIMEOUT_TRANSITION))?TIMEOUT_ONE:TIMEOUT_TWO))) {
+				if(connectiontype==1)		//causes the connection state to be reset so that nopefully a new connection can be made
+					state=INIT_STATE_SP1ML;	//A long interval with nothing found (about 2 minutes during runtime, and 10 seconds at boot)
+				else if(connectiontype==0)
+					state=ENTRY_STATE;	//A simple re-entry, no need to establish a new connection
+			}
 		}					
 	}
 }
@@ -268,8 +286,9 @@ bool connectionManager::dataDepacket(QByteArray* data, int n, QByteArray* data_o
 	int index=data->indexOf(HEAD,1)-1;//The next index
 	int siz;
 	if(index<0)		//Nothing found
-		index=data->size()-1;//Go to the end of the string
-	siz=index;
+		//index=data->size()-1;//Go to the end of the string
+		return false;	//There must always be at least the first byte of a second packet in the buffer
+	siz=index+1;		//The size in bytes
 	*data_output=data->mid(0,siz);//Copy to the output, only the output is manipulated here
 	//qDebug() << endl << (((*data_output))).toHex();
 	for(skip=1;skip<siz;skip++) {//Go through XORING, exclude the head byte, include the tail
@@ -277,13 +296,14 @@ bool connectionManager::dataDepacket(QByteArray* data, int n, QByteArray* data_o
 	}
 	//qDebug() << endl << "Received";
 	//qDebug() << endl << (((*data_output))).toHex();
-	index--;
 	while(index) {		//Start at the end of the packet and work in reverse, then remove the last byte, as its redundant, and return the payload
-		skip=(*data_output)[index];//Load the skip value
+		skip=(quint8)((*data_output)[index]);//Load the skip value
 		//qDebug() << endl << "Skip" << skip << index;
 		if(!skip) {
 			data_output->clear();
 			qDebug() << endl << "Skip error" << index << (*data_output)[0] << (*data_output)[1] <<  (*data_output)[2] <<  (*data_output)[3];
+			if(data->indexOf(HEAD,1)>0)
+				*data=data->right(data->size()-data->indexOf(HEAD,1));//Remove a possible junk packet
 			return false;
 		}
 		if(index>0)
@@ -291,7 +311,9 @@ bool connectionManager::dataDepacket(QByteArray* data, int n, QByteArray* data_o
 		index-=skip;
 		if( (index==0 && data->at(index)!=HEAD) || index<0 ) { //Neither of these two things should happen, if they do we aren't in a valid packet, so abort
 			data_output->clear();
-			qDebug() << endl << "Head error" << index << data_output->at(index);
+			qDebug() << endl << "Head error" << index << "," << data->indexOf(HEAD,1);//<< data_output->at(index);
+			if(data->indexOf(HEAD,1)>0)
+				*data=data->right(data->size()-data->indexOf(HEAD,1));//Remove a possible junk packet
 			return false;
 		}
 	}//Only one packet is extracted from the start

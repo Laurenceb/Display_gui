@@ -66,8 +66,8 @@ void Graph::setupRealtimeDataDemo(QCustomPlot *customPlot, PortSelectDialog *con
   connect(this, SIGNAL(setmask(quint16)), connection, SLOT(setChannelMask(quint16)));
 
   //Connect the aux channel control signals from the connectionDialog to the connectionmanager
-  connect(connectionDialog, SIGNAL(setauxmask(quint8)), connection, SLOT(setauxmask(quint8)));//set the aux channel mask bits
-  connect(connectionDialog, SIGNAL(setauxchanmode(bool)), connection, SLOT(setauxchanmode(bool)));//The operating mode
+  connect(connectionDialog, SIGNAL(setauxmask_(quint8)), connection, SLOT(setauxmask(quint8)),Qt::QueuedConnection);//set the aux channel mask bits
+  connect(connectionDialog, SIGNAL(setauxchanmode_(bool)), connection, SLOT(setauxchanmode(bool)));//The operating mode
 
   holdtime=14;
 

@@ -25,8 +25,8 @@ class PortSelectDialog : public QDialog
 		 //void openDevice(QString port_name);
 		 void newConnection(int devicetype);//Emitted when a new connection is made and we need to restart the connection manager state machine (type 1==SP1)
 		 void connectionLost();	//Emitted when we lose a serial connection
-		 void setauxmask(quint8 mask);//Emitted to set the mask for enabled aux channels
-		 void setauxchanmode(bool buttonselected);//Emitted to force the connection manager to switch between the two possible packet types
+		 void setauxmask_(quint8 mask);//Emitted to set the mask for enabled aux channels
+		 void setauxchanmode_(bool buttonselected);//Emitted to force the connection manager to switch between the two possible packet types
 	public slots:
 		 void setRTS(bool RTS);	//This is set to logic1 to enter command mode.
 		 void setDTR(bool DTR);

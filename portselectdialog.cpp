@@ -261,7 +261,7 @@ void PortSelectDialog::switchTelemType() {//A slot called when the telemetry typ
 		else
 			aux_buttons[n]->setText(aux_telem_names.at(n));
 	}
-	emit setauxchanmode(buttonselected);
+	emit setauxchanmode_(buttonselected);
 }
 
 void PortSelectDialog::onButtonSelected(int b) {//Handles aux telem channel reconfiguration
@@ -270,6 +270,6 @@ void PortSelectDialog::onButtonSelected(int b) {//Handles aux telem channel reco
 		if(aux_buttons[n]->isChecked())
 			mask|=(1<<n);
 	}
-	emit setauxmask(mask);
+	emit setauxmask_(mask);
 }
 
