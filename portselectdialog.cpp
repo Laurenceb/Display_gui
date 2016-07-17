@@ -66,6 +66,8 @@ QDialog(parent)
 	connect(the_port, SIGNAL(error(unsigned)), this, SLOT(onSerialError(unsigned)));
 	connect(the_port, SIGNAL(written()), this, SLOT(onWritten()));
 	connect(the_port, SIGNAL(portClosed()), this, SLOT(closeHandler()));//No need to emit the connectionlost signal if we know there is a port closure
+	connect(radio_group, SIGNAL(buttonClicked(int)), this, SLOT(onRadioSelected(int)));
+	connect(radio_group, SIGNAL(buttonReleased(int)), this, SLOT(onRadioSelected(int)));//For the connect/reconnect functionality
 	//setLayout(layout);
 	portTimer.start(1500); // Interval 0 means to refresh as fast as possible, set 1500ms to get approx 0.67hz. As well as ports, this also updates aux channels
 }

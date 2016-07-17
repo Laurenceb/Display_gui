@@ -59,7 +59,7 @@ void Graph::setupRealtimeDataDemo(QCustomPlot *customPlot, PortSelectDialog *con
   demoName = "Real Time Data Demo";
   
   connection = new connectionManager(this,connectionDialog);//This is used to pass data between the connection tab port and the graph
-  connect(connection, SIGNAL(setDataToGraph(datasample_t*)), this, SLOT(addData(datasample_t*)));//This message is passed to write new data to the plot
+  connect(connection, SIGNAL(setDataToGraph(datasample_t[100],int)), this, SLOT(addData(datasample_t[100],int)));//This message is passed to write new data to the plot
   //This is used to change the hold time of the graph window (negative hold times give demo mode)
   connect(validatorLineEdit, SIGNAL(returnPressed()), this, SLOT(changeHoldTime()));
   //Used to change the channel mask
@@ -238,36 +238,38 @@ void Graph::realtimeDataSlot()
       double plotme[8] = {value0, value1, value1*value0, value1-value0, value0+value1, -value0, -value1,value0-value1};//This should eventually be using buffer	
       for(qint8 n=0; n<8; n++) {
 	if(((int)floor(key)%60)>15.0&&((int)floor(key)%8)!=n) {//Most of the time just draw the lines as normal, otherwise for one of the traces we treat it differently
-    		(connection->latestdatasample).samples[n]=(qint16)(plotme[n]*(double)(1<<14));
+    		(connection->latestdatasamples[0]).samples[n]=(qint16)(plotme[n]*(double)(1<<14));
 	}
 	else if(((int)floor(key)%40)>20.0) {
-		(connection->latestdatasample).samples[n]=(qint16)((1<<15)-1);//One away from upper limit, this is the RLD replacement signal
+		(connection->latestdatasamples[0]).samples[n]=(qint16)((1<<15)-1);//One away from upper limit, this is the RLD replacement signal
 	}
 	else if(((int)floor(key)%25)>2.0)
-		(connection->latestdatasample).samples[n]=-(qint16)(1<<15);//The lead off signal
+		(connection->latestdatasamples[0]).samples[n]=-(qint16)(1<<15);//The lead off signal
 	/*else*/ if(n==7)
-		(connection->latestdatasample).samples[n]=-(qint16)(1<<15)+1;//Disabled (this will remain on)
+		(connection->latestdatasamples[0]).samples[n]=-(qint16)(1<<15)+1;//Disabled (this will remain on)
 	if(n && n<7)
-        	(connection->latestdatasample).quality[n]=0.9;
+        	(connection->latestdatasamples[0]).quality[n]=0.9;
 	else
-        	(connection->latestdatasample).quality[n]=0.6+0.35*qSin(key/2);
+        	(connection->latestdatasamples[0]).quality[n]=0.6+0.35*qSin(key/2);
       }
-      (connection->latestdatasample).sampletime=key;
-      //(connection->latestdatasample).channelmask=0x00FF;//The 8 ECG channels are active (little endian on the device) (for the fake data this is disabled)
-      (connection->latestdatasample).device_scale_factor=1.0/(float)(1<<15);//Around a millivolt of simulated range
-      addData(&(connection->latestdatasample));//Add the plot data directly
+      (connection->latestdatasamples[0]).sampletime=key;
+      //(connection->latestdatasamples[0]).channelmask=0x00FF;//The 8 ECG channels are active (little endian on the device) (for the fake data this is disabled)
+      (connection->latestdatasamples[0]).device_scale_factor=1.0/(float)(1<<15);//Around a millivolt of simulated range
+      addData(&(connection->latestdatasamples[0]),1);//Add the plot data directly
     }
 }
 
-void Graph::addData(datasample_t* datasamp) {
+void Graph::addData(datasample_t datasamp[100], int num_of_samples) {
     static double lastPointKey = 0;
     static qint16 inhibitmask = 0;//Initialised so that it allows auto channel disabling
-    double key=datasamp->sampletime;
+    double key=datasamp[num_of_samples-1].sampletime;//Time of last sample
     //Each time data is added to the plot, the file add slot is also called
-    emit addtofile(datasamp);
-    //Also send data to the BPM processor
-    emit addtobmp(datasamp);
-    quint16 tmpmask=datasamp->channelmask;
+    for(quint8 n=0;n<num_of_samples;n++) {
+    	emit addtofile(&(datasamp[n]));
+    	//Also send data to the BPM processor
+   	 emit addtobmp(&(datasamp[n]));
+    }
+    quint16 tmpmask=datasamp[0].channelmask;
     for(int n=0;n<8;n++) {//Set the mask according to the checked buttons across the bottom of the graph
 	if(channelenablebuttons[n]->isChecked())//Button needs to be checked
 		tmpmask|=(1<<n);
@@ -309,54 +311,56 @@ void Graph::addData(datasample_t* datasamp) {
     QStringList electrodes;
     electrodes << "RA" << "LA" << "LL" << "C1" << "C2" << "C3" << "C4" << "C5";
     for(int n=0; n<8; n++) {		//A maximum of 8 channels on the plot (TODO, add a second plot with accel, and possibly an orientation visualisation)
-	if((datasamp->channelmask)&(1<<n)) {
-		qint16 dat=datasamp->samples[n];//error status signals (limits are used to signal for electrode off and RLD remap in operation)
-		float qal=(float)datasamp->quality[n];//this is float in the 0 to 1.0 range, with 1.0 representing max quality
-		if(abs(dat)>((1<<15)-2)) {//Add some text annotation with info on connected lead numbers
-			if(dat>0) {	// update text label bottom (RLD replacement)
-				//txt_bot.append(QString::number(n,10));//Use the numerical channel
-				txt_bot.append(electrodes.at(n));//Use the electrode name as a string
-				txt_bot.append(",");
-				channelenablebuttons[n]->setEnabled(true);
-				channelenablebuttons[n]->setChecked(false);
-				inhibitmask|=(1<<n);
+	for(quint8 m=0; m<num_of_samples; m++) {
+		if((datasamp[m].channelmask)&(1<<n)) {
+			qint16 dat=datasamp[m].samples[n];//error status signals (limits are used to signal for electrode off and RLD remap in operation)
+			float qal=(float)datasamp[m].quality[n];//this is float in the 0 to 1.0 range, with 1.0 representing max quality
+			if(abs(dat)>((1<<15)-2)) {//Add some text annotation with info on connected lead numbers
+				if(dat>0) {	// update text label bottom (RLD replacement)
+					//txt_bot.append(QString::number(n,10));//Use the numerical channel
+					txt_bot.append(electrodes.at(n));//Use the electrode name as a string
+					txt_bot.append(",");
+					channelenablebuttons[n]->setEnabled(true);
+					channelenablebuttons[n]->setChecked(false);
+					inhibitmask|=(1<<n);
+				}
+				else if(dat==-(1<<15)) {//Missing electrode at the top, but only if its not a disabled channel (which has code of lower limit +1)
+					//txt_top.append(QString::number(n,10));
+					txt_top.append(electrodes.at(n));
+					txt_top.append(",");
+					channelenablebuttons[n]->setEnabled(true);
+					channelenablebuttons[n]->setChecked(false);
+					inhibitmask|=(1<<n);
+				}
+				else if(dat==-(1<<15)+1) {//A channel that is disabled at the device end
+					channelenablebuttons[n]->setChecked(false);//Disable the channel to free up capacity
+					channelenablebuttons[n]->setEnabled(false);//Set the buttons of disabled channels as greyed out. It is assumed config doesnt change
+					inhibitmask&=~(1<<n);
+				}//but these setting are reset when a new connection is made to a device or a port
 			}
-			else if(dat==-(1<<15)) {//Missing electrode at the top, but only if its not a disabled channel (which has code of lower limit +1)
-				//txt_top.append(QString::number(n,10));
-				txt_top.append(electrodes.at(n));
-				txt_top.append(",");
+        		else {	//Normal buttons
 				channelenablebuttons[n]->setEnabled(true);
-				channelenablebuttons[n]->setChecked(false);
-				inhibitmask|=(1<<n);
-			}
-			else if(dat==-(1<<15)+1) {//A channel that is disabled at the device end
-				channelenablebuttons[n]->setChecked(false);//Disable the channel to free up capacity
-				channelenablebuttons[n]->setEnabled(false);//Set the buttons of disabled channels as greyed out. It is assumed config doesnt change
+				if(datasamp[m].channelmask&(1<<n))//Channel is enabled
+					channelenablebuttons[n]->setChecked(true);//Reset the button as appropriate
 				inhibitmask&=~(1<<n);
-			}//but these setting are reset when a new connection is made to a device or a port
-		}
-        	else {	//Normal buttons
-			channelenablebuttons[n]->setEnabled(true);
-			if(datasamp->channelmask&(1<<n))//Channel is enabled
-				channelenablebuttons[n]->setChecked(true);//Reset the button as appropriate
-			inhibitmask&=~(1<<n);
-			//customPlot_->graph(n)->addData(key, (float)dat/(float)(1<<15));//Data is in the +-1 range
-			customPlot_->graph(7-n)->addData(key, (float)dat*datasamp->device_scale_factor);//Data is in millivolts (note reverse order for first 8)
-        		customPlot_->graph(n+8)->clearData();    // set data of dots: 
-        		//customPlot_->graph(n+8)->addData(key, (float)dat/(float)(1<<15));//The indicator
-			customPlot_->graph(n+8)->addData(key, (float)dat*datasamp->device_scale_factor);
-			//The is a progressbar style shading across the button
-			if(qal>0.99)
-				qal=0.99;
-			if(qal<0.15)
-				qal=0.15;
+				//customPlot_->graph(n)->addData(key, (float)dat/(float)(1<<15));//Data is in the +-1 range
+				customPlot_->graph(7-n)->addData(key, (float)dat*datasamp[m].device_scale_factor);//Data is in millivolts (note reverse order for first 8)
+        			customPlot_->graph(n+8)->clearData();    // set data of dots: 
+        			//customPlot_->graph(n+8)->addData(key, (float)dat/(float)(1<<15));//The indicator
+				customPlot_->graph(n+8)->addData(key, (float)dat*datasamp[m].device_scale_factor);
+				//The is a progressbar style shading across the button
+				if(qal>0.99)
+					qal=0.99;
+				if(qal<0.15)
+					qal=0.15;
 //qDebug() << style_populator[n].arg(QString::asprintf("%.2f",qal),QString::asprintf("%.2f",qal+0.01));
-			channelenablebuttons[n]->setStyleSheet(style_populator[n].arg(QString::asprintf("%.2f",qal),QString::asprintf("%.2f",qal+0.01)));
+				channelenablebuttons[n]->setStyleSheet(style_populator[n].arg(QString::asprintf("%.2f",qal),QString::asprintf("%.2f",qal+0.01)));
+			}
 		}
-	}
-	else {//This plot line and indicator point needs to be removed from the graph
-		customPlot_->graph(7-n)->clearData();//Remove all the plotline data for disabled plots
-		customPlot_->graph(n+8)->clearData();//Remove the plot point as well
+		else {//This plot line and indicator point needs to be removed from the graph
+			customPlot_->graph(7-n)->clearData();//Remove all the plotline data for disabled plots
+			customPlot_->graph(n+8)->clearData();//Remove the plot point as well
+		}
 	}
     }
     if(txt_top.size()>9) {
@@ -379,7 +383,7 @@ void Graph::addData(datasample_t* datasamp) {
     }
     // rescale value (vertical) axis to fit the current data:
     for(int n=0, l=0; n<8; n++) {
-	if((datasamp->channelmask)&(1<<n)) {
+	if((datasamp[0].channelmask)&(1<<n)) {//Just use the first sample to retreive the mask
         	customPlot_->graph(7-n)->rescaleValueAxis(l>0);//Only enlarge the extra axes
 		l++;
 	}
@@ -397,16 +401,17 @@ void Graph::addData(datasample_t* datasamp) {
     // check to see if the GPS heading/battery voltage telemetry stream is enabled. If it is, look for a negative value and strip off percentage charge
     static qint16 percent_charged=-1;// The -1 code indicates that there is no valid data
     qint16 percent_charged_=-1;
-    if((datasamp->channelmask)&(1<<11)) {//the 11th channel contains battery/heading info
-	qint16 dat=datasamp->samples[11];
-	if(dat<0) {			//This is a battery value (the heading values are always greater or equal to zero)
-		percent_charged_=(-dat)&0x7F;//the lower 7 bits are the charge state
-		if(percent_charged_>100 || percent_charged_<0)//the data is invalid
-			percent_charged_=-1;
-		percent_charged=percent_charged_;//copy into the static
+    if((datasamp[0].channelmask)&(1<<11)) {//the 11th channel contains battery/heading info
+	for(quint8 n=0; n<num_of_samples; n++) {
+		qint16 dat=datasamp[n].samples[11];
+		if(dat<0) {		//This is a battery value (the heading values are always greater or equal to zero)
+			percent_charged_=(-dat)&0x7F;//the lower 7 bits are the charge state
+			if(percent_charged_>100 || percent_charged_<0)//the data is invalid
+				percent_charged_=-1;
+			percent_charged=percent_charged_;//copy into the static
+		}
 	}
     }
-
     // calculate frames per second:
     static double lastFpsKey;
     static int frameCount;
