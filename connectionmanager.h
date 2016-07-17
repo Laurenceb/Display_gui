@@ -97,6 +97,7 @@ class connectionManager: public QObject
 		int connectiontype;//The type of connection, type 0 is a rfcomm or raw serial connection, type 1 is an SP1ML, higher numbers could be used in future
 		int lastsequencenumber;//Used to track any missed packets and attempt to correct the time accordingly
 		quint8 operatingmode;
-        quint16 cable_capacitance;//Used to pass the capacitance value of the connected cable to the impedance estimator
+        	quint16 cable_capacitance;//Used to pass the capacitance value of the connected cable to the impedance estimator
+		quint16 request_mask;//Used to pass requests to the device
 };
 #endif

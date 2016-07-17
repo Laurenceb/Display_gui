@@ -25,8 +25,9 @@ QObject(parent)
 	operatingmode=0;		//Normal mode
     cable_capacitance=CABLE_CAPACITANCE;
 	state=INIT_STATE_SP1ML;		//The initial "parking" state
+	request_mask=0x00FF;//Initialise with all ECG channels enabled
 	for(quint8 m=0;m<100;m++) {
-		latestdatasamples[m].channelmask=0x00FF;//Initialise with all the ECG channels enabled
+		//latestdatasamples[m].channelmask=0x00FF;//Initialise with all the ECG channels enabled
 		for(qint8 n=0; n<8; n++)
 			latestdatasamples[m].rawquality[n]=LEAD_OFF_MIN_QUALITY/2.0;//Init the quality filter with close to the lowest quality (this inits the filtered value) 
 	}
@@ -150,7 +151,7 @@ void connectionManager::connectionStateMachine() {
 			else
 				transmitbuffer.append(PACKET_HEAD"4");//Message type 4 mode sends raw IMU data
 			transmitbuffer.append(QString::asprintf("%02x",requests));//Zero padded hex
-			transmitbuffer.append(QString::asprintf("%04x",latestdatasamples[0].channelmask));//16 bit int as 4 hex characters
+			transmitbuffer.append(QString::asprintf("%04x",request_mask));//16 bit int as 4 hex characters
 			emit sendData(&transmitbuffer);
 		}
 		internaltimeout--;
@@ -158,7 +159,7 @@ void connectionManager::connectionStateMachine() {
 		QByteArray readpacket;
 		qint16 count=0;
 		for(qint16 n=0;n<16;n++)
-			count+=(latestdatasamples[0].channelmask&(1<<n))?1:0;
+			count+=(request_mask&(1<<n))?1:0;
 		quint8 foundapacket=0;
 		while(dataDepacket(&receivebuffer, count*2, &readpacket)) {//A packet was found, process it (count is number of channels, add two byte overhead)
 			if(!connectiontype && !latestdatasamples[foundapacket].device_scale_factor)
@@ -354,13 +355,13 @@ void connectionManager::lostConnection(void) {
 
 void connectionManager::setChannelMask(quint16 newmask) {//This is a slot used to configure which channels will be plotted
 	for(quint8 m=0;m<100;m++)
-		latestdatasamples[m].channelmask=newmask;
+		request_mask=newmask;
 }
 
 void connectionManager::setauxmask(quint8 mask) {
 	for(quint8 m=0;m<100;m++) {
-		latestdatasamples[m].channelmask&=0x00FF;//wipe upper 8 bits
-		latestdatasamples[m].channelmask|=(mask<<8);//set them as appropriate
+		request_mask&=0x00FF;//wipe upper 8 bits
+		request_mask|=(mask<<8);//set them as appropriate
 	}
 }
 
