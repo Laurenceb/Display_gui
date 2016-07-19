@@ -70,12 +70,13 @@ class connectionManager: public QObject
 		~connectionManager();
 		void connectionStateMachine(void);
 		QByteArray connectedDeviceName;
-		datasample_t latestdatasamples[100];		//This can be used to accumulate multiple samples to be added to the graph (allows fps>=2.5)
+		QVector<datasample_t> latestdatasamples;	//This can be used to accumulate multiple samples to be added to the graph (allows fps>=2.5)
+		datasample_t workingdatasample;
 		datasample_buff_t datasamplehist;		//Historical sample buffer, used for filtering
 		signals:
 		 void setDTR(bool);
 		 void setRTS(bool);
-		 void setDataToGraph(datasample_t[100],int);	//This is used to append new data samples to the graph. Note magic numbers are not processed here
+		 void setDataToGraph(const QVector<datasample_t>&);//This is used to append new data samples to the graph. Note magic numbers are not processed here
 		 void setDeviceDescriptor(QByteArray*);		//Used to set the device name to the GUI
 		 void sendData(QByteArray*);
 		 void readAsString(QByteArray* data);
@@ -87,6 +88,7 @@ class connectionManager: public QObject
 		 void setauxmask(quint8 mask);
 		 void setauxchanmode(bool mode);
 	private:
+		Q_DISABLE_COPY(connectionManager);
 		bool dataDepacket(QByteArray* data, int n, QByteArray* data_output);
 		PortSelectDialog* used_port;
 		bool connection;

@@ -26,11 +26,10 @@ QObject(parent)
     cable_capacitance=CABLE_CAPACITANCE;
 	state=INIT_STATE_SP1ML;		//The initial "parking" state
 	request_mask=0x00FF;//Initialise with all ECG channels enabled
-	for(quint8 m=0;m<100;m++) {
-		//latestdatasamples[m].channelmask=0x00FF;//Initialise with all the ECG channels enabled
-		for(qint8 n=0; n<8; n++)
-			latestdatasamples[m].rawquality[n]=LEAD_OFF_MIN_QUALITY/2.0;//Init the quality filter with close to the lowest quality (this inits the filtered value) 
-	}
+	//latestdatasamples[m].channelmask=0x00FF;//Initialise with all the ECG channels enabled
+	for(qint8 n=0; n<8; n++)
+		workingdatasamples.rawquality[n]=LEAD_OFF_MIN_QUALITY/2.0;//Init the quality filter with close to the lowest quality (this inits the filtered value)
+	latestdatasamples.append(workingdatasample); 
 }		
 
 void connectionManager::connectionStateMachine() {
@@ -61,7 +60,7 @@ void connectionManager::connectionStateMachine() {
 		emit readAsString(&receivebuffer);
 		if(dataDepacket(&receivebuffer, 0, &readpacket)) {//If something was read (any following packets are left in the buffer)
 			for(quint8 m=0; m<100; m++)
-				latestdatasamples[m].device_scale_factor=ADC_SCALE_FACTOR/(float)readpacket[2];//First arg byte (after address and sequence) is gain
+				workingdatasample.device_scale_factor=ADC_SCALE_FACTOR/(float)readpacket[2];//First arg byte (after address and sequence) is gain
 			connectedDeviceName=readpacket.right(readpacket.size()-3);//Process the device name (first byte is the gain setting)
 			connectedDeviceName.insert(0,QByteArray("ISM:"));//The name that is actually displayed in the GUI is proceeded by "ISM:"
 			emit setDeviceDescriptor(&connectedDeviceName);
@@ -136,9 +135,7 @@ void connectionManager::connectionStateMachine() {
 		timelastpacket=secondsSinceEpoch;
 		lastsequencenumber=0;
 		if(connectiontype==0) {		//This is reset to zero if we have a RN-42/bluetooth/raw serial device connected
-			for(quint8 m=0; m<100; m++)
-				latestdatasamples[m].device_scale_factor=0;//If device type is zero & scale factor also zero in following routine, use sequence no.
-		}
+			workingdatasamples.device_scale_factor=0;//If device type is zero & scale factor also zero in following routine, use sequence no.
 		currentestimateddevicetime=secondsSinceEpoch;//All these are reset to defaults
 		state=ENTRY_STATE+1;		//Continue straight into the next state once these static variables have been set
 	case ENTRY_STATE+1:
@@ -162,8 +159,8 @@ void connectionManager::connectionStateMachine() {
 			count+=(request_mask&(1<<n))?1:0;
 		quint8 foundapacket=0;
 		while(dataDepacket(&receivebuffer, count*2, &readpacket)) {//A packet was found, process it (count is number of channels, add two byte overhead)
-			if(!connectiontype && !latestdatasamples[foundapacket].device_scale_factor)
-				latestdatasamples[foundapacket].device_scale_factor=ADC_SCALE_FACTOR/(float)readpacket[1];//Populate this using the first sequence number
+			if(!connectiontype && !workingdatasample.device_scale_factor)
+				workingdatasample.device_scale_factor=ADC_SCALE_FACTOR/(float)readpacket[1];//Populate this using the first sequence number
 			double timegap=secondsSinceEpoch-timelastpacket;//This should be rounded to the nearest GUI refresh interval, also serial delay to consider
 			int gap=((int)((quint8)readpacket[1])-lastsequencenumber);//Normally this should be 1, but if packets are missed it could be greater
 			if(gap<0)
@@ -181,7 +178,7 @@ void connectionManager::connectionStateMachine() {
 			qint16 indx=2;				//Starting index of the data (there is a network address and sequence number first)
 			qint8 historybufferr=0;
 			for(qint16 n=0; n<16; n++) {		//There are a maximum of 16 channels supported by the protocol
-				if(latestdatasamples[foundapacket].channelmask&(1<<n)) {//The current channel is enabled
+				if(workingdatasample.channelmask&(1<<n)) {//The current channel is enabled
 					if((indx+1)>=readpacket.size()) {
 						historybufferr=1;	//Mark this as an error
 						//qDebug() << endl << "indx" << indx << readpacket.size();
@@ -196,7 +193,7 @@ void connectionManager::connectionStateMachine() {
 							difference+=256;
 						if(difference==2) {//Normal packet spacing, everything is ok
 							bindex[n]++;
-							latestdatasamples[foundapacket].samples[n]=(tempbuf+datasamplehist.samples[n][1])>>1;//comb block filt at 62.5hz
+							workingdatasample.samples[n]=(tempbuf+datasamplehist.samples[n][1])>>1;//comb block filt at 62.5hz
 							if(!(bindex[n]&0x03)) {//Generate an I and a Q value from the last 4 samples (they might not be sequential)
 								qint32 I=0,Q=0;
 								for(quint8 ind=0; ind<4; ind++) {
@@ -224,12 +221,12 @@ void connectionManager::connectionStateMachine() {
 							if(bindex[n]>=36)
 								bindex[n]=0xff;	//so it rolls over
 							float diff=(float)qualityfilter[n];//Use float type to process the data using conversion factor
-							diff*=6.10e-8*latestdatasamples[foundapacket].device_scale_factor;// Convert to volts (peak to peak)
+							diff*=6.10e-8*workingdatasample.device_scale_factor;// Convert to volts (peak to peak)
 							diff=240.0*diff+exp(110000.0*diff*diff*diff*pow((cable_capacitance+200.0)/400.0,3));//Brute force match-> Mohm
 							diff*=1000.0;// Now in units of k ohm, matching equation models board as ~200pF
 							diff-=BOARD_IMPEDANCE;// This impedance is present already on the board
-							latestdatasamples[foundapacket].rawquality[n]=latestdatasamples[foundapacket].rawquality[n]*(1.0-GAIN_COEFFICIENT)+diff*GAIN_COEFFICIENT;
-							latestdatasamples[foundapacket].quality[n]=CONVERT_GAIN*logf(latestdatasamples[foundapacket].rawquality[n])+CONVERT_OFFSET;//display value
+							workingdatasample.rawquality[n]=workingdatasample.rawquality[n]*(1.0-GAIN_COEFFICIENT)+diff*GAIN_COEFFICIENT;
+							workingdatasample.quality[n]=CONVERT_GAIN*logf(workingdatasample.rawquality[n])+CONVERT_OFFSET;//display value
 						}
 						else {
 							historybufferr=2;//There was a problem filtering the data due to missing packets
@@ -244,14 +241,16 @@ void connectionManager::connectionStateMachine() {
 						datasamplehist.indices[n][0]=(int)((quint8)readpacket[1]);
 					}
 					else			//Load the sample from the byte array little-endian
-						latestdatasamples[foundapacket].samples[n]=(readpacket[indx])||(readpacket[indx+1]<<8);
+						workingdatasample.samples[n]=(readpacket[indx])||(readpacket[indx+1]<<8);
 					indx+=2;
 				}
 			}				
 			if(!historybufferr) {			//If we have good samples
 				//qDebug() << endl << "Received";
-				latestdatasamples[foundapacket].sampletime=currentestimateddevicetime;
+				workingdatasample.sampletime=currentestimateddevicetime;
+				latestdatasamples.append(workingdatasample);
 				emit setDataToGraph(latestdatasamples,foundapacket+1);	//This is connected to the plotter, add one to foundapacket, convert to samps
+				latestdatasamples.clear();
 			}
 			else
 				qDebug() << endl << "Receive error" << historybufferr << "," << (int)(readpacket[1]);
@@ -269,9 +268,10 @@ void connectionManager::connectionStateMachine() {
 }
 
 // connect(sender, &QObject::destroyed, [=](){ this->m_objects.remove(sender); });
-connectionManager::~connectionManager()
-{
-}
+virtual ~connectionManager();
+//connectionManager::~connectionManager()
+//{
+//}
 
 //This returns true if the a valid packet is found. The argument n is a helper to give an idea of how big the payload should be (excludes net & sync), set 0 to ignore
 //Extracts a single payload starting from the left
