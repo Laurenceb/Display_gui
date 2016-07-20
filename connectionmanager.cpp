@@ -249,12 +249,10 @@ void connectionManager::connectionStateMachine() {
 				//qDebug() << endl << "Received";
 				workingdatasample.sampletime=currentestimateddevicetime;
 				latestdatasamples.append(workingdatasample);
-				emit setDataToGraph(latestdatasamples/*,foundapacket+1*/);//This is connected to the plotter, add one to foundapacket, convert to samps
-				latestdatasamples.clear();
+				foundapacket++;			//This holds the number of packets that have been found, used as an index to the data
 			}
 			else
 				qDebug() << endl << "Receive error" << historybufferr << "," << (int)(readpacket[1]);
-			foundapacket++;				//This holds the number of packets that have been found, used as an index to the data
 		}
 		if(!foundapacket) {
 			if(secondsSinceEpoch>(timelastpacket+((secondsSinceEpoch<(connectiontime+TIMEOUT_TRANSITION))?TIMEOUT_ONE:TIMEOUT_TWO))) {
@@ -263,7 +261,11 @@ void connectionManager::connectionStateMachine() {
 				else if(connectiontype==0)
 					state=ENTRY_STATE;	//A simple re-entry, no need to establish a new connection
 			}
-		}					
+		}
+		else {
+			emit setDataToGraph(latestdatasamples/*,foundapacket+1*/);//This is connected to the plotter, add 1 to foundapacket, convert 2 samp
+			latestdatasamples.clear();
+		}
 	}
 }
 
