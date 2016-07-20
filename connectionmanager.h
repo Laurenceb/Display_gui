@@ -67,7 +67,7 @@ class connectionManager: public QObject
 	Q_OBJECT
 	public:
 		explicit connectionManager(QObject *parent = 0,PortSelectDialog* used_port_=0);
-		~connectionManager();
+		/*virtual*/ ~connectionManager();
 		void connectionStateMachine(void);
 		QByteArray connectedDeviceName;
 		QVector<datasample_t> latestdatasamples;	//This can be used to accumulate multiple samples to be added to the graph (allows fps>=2.5)
@@ -76,7 +76,7 @@ class connectionManager: public QObject
 		signals:
 		 void setDTR(bool);
 		 void setRTS(bool);
-		 void setDataToGraph(const QVector<datasample_t>&);//This is used to append new data samples to the graph. Note magic numbers are not processed here
+		 void setDataToGraph(QVector<datasample_t>&);//This is used to append new data samples to the graph. Note magic numbers are not processed here
 		 void setDeviceDescriptor(QByteArray*);		//Used to set the device name to the GUI
 		 void sendData(QByteArray*);
 		 void readAsString(QByteArray* data);

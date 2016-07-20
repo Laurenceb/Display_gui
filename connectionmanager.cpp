@@ -28,7 +28,7 @@ QObject(parent)
 	request_mask=0x00FF;//Initialise with all ECG channels enabled
 	//latestdatasamples[m].channelmask=0x00FF;//Initialise with all the ECG channels enabled
 	for(qint8 n=0; n<8; n++)
-		workingdatasamples.rawquality[n]=LEAD_OFF_MIN_QUALITY/2.0;//Init the quality filter with close to the lowest quality (this inits the filtered value)
+		workingdatasample.rawquality[n]=LEAD_OFF_MIN_QUALITY/2.0;//Init the quality filter with close to the lowest quality (this inits the filtered value)
 	latestdatasamples.append(workingdatasample); 
 }		
 
@@ -134,8 +134,8 @@ void connectionManager::connectionStateMachine() {
 		connectiontime=secondsSinceEpoch;
 		timelastpacket=secondsSinceEpoch;
 		lastsequencenumber=0;
-		if(connectiontype==0) {		//This is reset to zero if we have a RN-42/bluetooth/raw serial device connected
-			workingdatasamples.device_scale_factor=0;//If device type is zero & scale factor also zero in following routine, use sequence no.
+		if(connectiontype==0)		//This is reset to zero if we have a RN-42/bluetooth/raw serial device connected
+			workingdatasample.device_scale_factor=0;//If device type is zero & scale factor also zero in following routine, use sequence no.
 		currentestimateddevicetime=secondsSinceEpoch;//All these are reset to defaults
 		state=ENTRY_STATE+1;		//Continue straight into the next state once these static variables have been set
 	case ENTRY_STATE+1:
@@ -249,7 +249,7 @@ void connectionManager::connectionStateMachine() {
 				//qDebug() << endl << "Received";
 				workingdatasample.sampletime=currentestimateddevicetime;
 				latestdatasamples.append(workingdatasample);
-				emit setDataToGraph(latestdatasamples,foundapacket+1);	//This is connected to the plotter, add one to foundapacket, convert to samps
+				emit setDataToGraph(latestdatasamples/*,foundapacket+1*/);//This is connected to the plotter, add one to foundapacket, convert to samps
 				latestdatasamples.clear();
 			}
 			else
@@ -268,10 +268,10 @@ void connectionManager::connectionStateMachine() {
 }
 
 // connect(sender, &QObject::destroyed, [=](){ this->m_objects.remove(sender); });
-virtual ~connectionManager();
-//connectionManager::~connectionManager()
-//{
-//}
+//virtual ~connectionManager();
+connectionManager::~connectionManager()
+{
+}
 
 //This returns true if the a valid packet is found. The argument n is a helper to give an idea of how big the payload should be (excludes net & sync), set 0 to ignore
 //Extracts a single payload starting from the left

@@ -261,7 +261,7 @@ void Graph::realtimeDataSlot()
     }
 }
 
-void Graph::addData(const QVector<datasample_t>&datasamp) {
+void Graph::addData(QVector<datasample_t>&datasamp) {
     static double lastPointKey = 0;
     static qint16 inhibitmask = 0;//Initialised so that it allows auto channel disabling
     static qint16 percent_charged=-1;// The -1 code indicates that there is no valid data
