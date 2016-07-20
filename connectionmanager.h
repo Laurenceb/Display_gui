@@ -76,7 +76,7 @@ class connectionManager: public QObject
 		signals:
 		 void setDTR(bool);
 		 void setRTS(bool);
-		 void setDataToGraph(QVector<datasample_t>&);//This is used to append new data samples to the graph. Note magic numbers are not processed here
+		 void setDataToGraph(const QVector<datasample_t>&);//This is used to append new data samples to the graph. Note magic numbers are not processed here
 		 void setDeviceDescriptor(QByteArray*);		//Used to set the device name to the GUI
 		 void sendData(QByteArray*);
 		 void readAsString(QByteArray* data);

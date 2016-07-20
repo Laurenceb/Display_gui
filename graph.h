@@ -66,7 +66,7 @@ private slots:
   void realtimeDataSlot();
   void bracketDataSlot();
   void screenShot();
-  void addData(QVector<datasample_t>&);//number of samples holds the number of samples to be added
+  void addData(const QVector<datasample_t>&);//number of samples holds the number of samples to be added
   void reinitConnection(int connectiontype);
   void changeHoldTime();
   void updateBPMlabel(double value, double timestamp);

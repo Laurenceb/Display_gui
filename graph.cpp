@@ -59,7 +59,7 @@ void Graph::setupRealtimeDataDemo(QCustomPlot *customPlot, PortSelectDialog *con
   demoName = "Real Time Data Demo";
   
   connection = new connectionManager(this,connectionDialog);//This is used to pass data between the connection tab port and the graph
-  connect(connection, SIGNAL(setDataToGraph(QVector<datasample_t>&)), this, SLOT(addData(QVector<datasample_t>&)));//This message is passed to write new data to the plot
+  connect(connection, SIGNAL(setDataToGraph(const QVector<datasample_t>&)), this, SLOT(addData(const QVector<datasample_t>&)));//This message is passed to write new data to the plot
   //This is used to change the hold time of the graph window (negative hold times give demo mode)
   connect(validatorLineEdit, SIGNAL(returnPressed()), this, SLOT(changeHoldTime()));
   //Used to change the channel mask
@@ -261,7 +261,7 @@ void Graph::realtimeDataSlot()
     }
 }
 
-void Graph::addData(QVector<datasample_t>&datasamp) {
+void Graph::addData(const QVector<datasample_t>&datasamp) {
     static double lastPointKey = 0;
     static qint16 inhibitmask = 0;//Initialised so that it allows auto channel disabling
     static qint16 percent_charged=-1;// The -1 code indicates that there is no valid data
@@ -434,6 +434,8 @@ void Graph::addData(QVector<datasample_t>&datasamp) {
       lastFpsKey = key;
       frameCount = 0;
     }
+    //if(!datasamp.isEmpty())
+	//datasamp.clear();
 }
 
 void Graph::bracketDataSlot()
