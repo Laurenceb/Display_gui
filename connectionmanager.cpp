@@ -23,10 +23,10 @@ QObject(parent)
 	SP1MLnetworkaddress=LOWEST_ADDRESS-1;//First device connects at this address. The address is incremented with each subsequenct connection
 	connection=false;
 	operatingmode=0;		//Normal mode
-    cable_capacitance=CABLE_CAPACITANCE;
+	cable_capacitance=CABLE_CAPACITANCE;
 	state=INIT_STATE_SP1ML;		//The initial "parking" state
 	request_mask=0x00FF;//Initialise with all ECG channels enabled
-	//latestdatasamples[m].channelmask=0x00FF;//Initialise with all the ECG channels enabled
+	workingdatasample.channelmask=0x00FF;//Initialise with all the ECG channels enabled
 	for(qint8 n=0; n<8; n++)
 		workingdatasample.rawquality[n]=LEAD_OFF_MIN_QUALITY/2.0;//Init the quality filter with close to the lowest quality (this inits the filtered value)
 	latestdatasamples.append(workingdatasample); 

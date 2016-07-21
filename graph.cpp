@@ -311,7 +311,7 @@ void Graph::addData(const QVector<datasample_t>&datasamp) {
     QString txt_top=QString("Lead off:");
     QStringList electrodes;
     electrodes << "RA" << "LA" << "LL" << "C1" << "C2" << "C3" << "C4" << "C5";
-    quint8 textlabelplaced=0;			//Used to prevent multiple text labels being generated
+    quint8 textlabelplaced[8]={};		//Used to prevent multiple text labels being generated
     foreach(thissample, datasamp) {
     	//Each time data is added to the plot, the file add slot is also called
 	emit addtofile(&(thissample));
@@ -323,8 +323,8 @@ void Graph::addData(const QVector<datasample_t>&datasamp) {
 			float qal=(float)thissample.quality[n];//this is float in the 0 to 1.0 range, with 1.0 representing max quality
 			if(abs(dat)>((1<<15)-2)) {//Add some text annotation with info on connected lead numbers
 				if(dat>0) {	// update text label bottom (RLD replacement)
-					if(!textlabelplaced) {
-						textlabelplaced=1;
+					if(!textlabelplaced[n]) {
+						textlabelplaced[n]=1;
 						//txt_bot.append(QString::number(n,10));//Use the numerical channel
 						txt_bot.append(electrodes.at(n));//Use the electrode name as a string
 						txt_bot.append(",");
@@ -334,8 +334,8 @@ void Graph::addData(const QVector<datasample_t>&datasamp) {
 					inhibitmask|=(1<<n);
 				}
 				else if(dat==-(1<<15)) {//Missing electrode at the top, but only if its not a disabled channel (which has code of lower limit +1)
-					if(!textlabelplaced) {
-						textlabelplaced=2;
+					if(!textlabelplaced[n]) {
+						textlabelplaced[n]=2;
 						//txt_top.append(QString::number(n,10));
 						txt_top.append(electrodes.at(n));
 						txt_top.append(",");
