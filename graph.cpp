@@ -208,6 +208,8 @@ void Graph::setupRealtimeDataDemo(QCustomPlot *customPlot, PortSelectDialog *con
   textLabelbpm->setFont(font); // make font a bit larger
   textLabelbpm->setPen(QPen(Qt::NoPen)); // show no border around text
 
+  (connection->latestdatasamples[0]).channelmask=0x00FF;//The 8 ECG channels are active (little endian on the device) (for the fake data this is disabled)
+
   customPlot_=customPlot;
   // setup a timer that repeatedly calls MainWindow::realtimeDataSlot:
   QObject::connect(&dataTimer, SIGNAL(timeout()), this, SLOT(realtimeDataSlot()));
@@ -309,28 +311,35 @@ void Graph::addData(const QVector<datasample_t>&datasamp) {
     QString txt_top=QString("Lead off:");
     QStringList electrodes;
     electrodes << "RA" << "LA" << "LL" << "C1" << "C2" << "C3" << "C4" << "C5";
+    quint8 textlabelplaced=0;			//Used to prevent multiple text labels being generated
     foreach(thissample, datasamp) {
-	    //Each time data is added to the plot, the file add slot is also called
-	    emit addtofile(&(thissample));
-	    //Also send data to the BPM processor
-	    emit addtobmp(&(thissample));
-	for(int n=0; n<8; n++) {		//A maximum of 8 channels on the plot (TODO, add a second plot with accel, and possibly an orientation visualisation)
+    	//Each time data is added to the plot, the file add slot is also called
+	emit addtofile(&(thissample));
+	//Also send data to the BPM processor
+	emit addtobmp(&(thissample));
+    	for(int n=0; n<8; n++) {		//A maximum of 8 channels on the plot (TODO, add a second plot with accel, and possibly an orientation visualisation)
 		if((thissample.channelmask)&(1<<n)) {
 			qint16 dat=thissample.samples[n];//error status signals (limits are used to signal for electrode off and RLD remap in operation)
 			float qal=(float)thissample.quality[n];//this is float in the 0 to 1.0 range, with 1.0 representing max quality
 			if(abs(dat)>((1<<15)-2)) {//Add some text annotation with info on connected lead numbers
 				if(dat>0) {	// update text label bottom (RLD replacement)
-					//txt_bot.append(QString::number(n,10));//Use the numerical channel
-					txt_bot.append(electrodes.at(n));//Use the electrode name as a string
-					txt_bot.append(",");
+					if(!textlabelplaced) {
+						textlabelplaced=1;
+						//txt_bot.append(QString::number(n,10));//Use the numerical channel
+						txt_bot.append(electrodes.at(n));//Use the electrode name as a string
+						txt_bot.append(",");
+					}
 					channelenablebuttons[n]->setEnabled(true);
 					channelenablebuttons[n]->setChecked(false);
 					inhibitmask|=(1<<n);
 				}
 				else if(dat==-(1<<15)) {//Missing electrode at the top, but only if its not a disabled channel (which has code of lower limit +1)
-					//txt_top.append(QString::number(n,10));
-					txt_top.append(electrodes.at(n));
-					txt_top.append(",");
+					if(!textlabelplaced) {
+						textlabelplaced=2;
+						//txt_top.append(QString::number(n,10));
+						txt_top.append(electrodes.at(n));
+						txt_top.append(",");
+					}
 					channelenablebuttons[n]->setEnabled(true);
 					channelenablebuttons[n]->setChecked(false);
 					inhibitmask|=(1<<n);
