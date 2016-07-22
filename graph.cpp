@@ -70,6 +70,7 @@ void Graph::setupRealtimeDataDemo(QCustomPlot *customPlot, PortSelectDialog *con
   connect(connectionDialog, SIGNAL(setauxchanmode_(bool)), connection, SLOT(setauxchanmode(bool)));//The operating mode
 
   holdtime=14;
+  demomode=false;
 
   //Add a BPM estimator and connect it to the graph functions via signals and slots
   bpmestimator = new  BPMestimator((1.0/DATA_RATE), false/*true*/);//Note peakfinder disabled, at least for debugging, not clear if it helps overall
