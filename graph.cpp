@@ -66,7 +66,8 @@ void Graph::setupRealtimeDataDemo(QCustomPlot *customPlot, PortSelectDialog *con
   connect(this, SIGNAL(setmask(quint16)), connection, SLOT(setChannelMask(quint16)));
 
   //Connect the aux channel control signals from the connectionDialog to the connectionmanager
-  connect(connectionDialog, SIGNAL(setauxmask_(quint8)), connection, SLOT(setauxmask(quint8)),Qt::QueuedConnection);//set the aux channel mask bits
+  connect(connectionDialog, SIGNAL(setauxmask_(quint8)), connection, SLOT(setauxmask(quint8))/*,Qt::QueuedConnection*/);//set the aux channel mask bits
+  connect(connectionDialog, SIGNAL(setecgmask_(quint8)), connection, SLOT(setecgmask(quint8)));//set only the enabled ecg channels
   connect(connectionDialog, SIGNAL(setauxchanmode_(bool)), connection, SLOT(setauxchanmode(bool)));//The operating mode
 
   holdtime=14;
@@ -266,7 +267,7 @@ void Graph::realtimeDataSlot()
 
 void Graph::addData(const QVector<datasample_t>&datasamp) {
     static double lastPointKey = 0;
-    static qint16 inhibitmask = 0;//Initialised so that it allows auto channel disabling
+    static quint16 requestmask = 0x08FF;//This is the set of channels which is enabled 
     static qint16 percent_charged=-1;// The -1 code indicates that there is no valid data
     datasample_t thissample;
     double key=datasamp.last().sampletime;//Time of last sample
@@ -351,10 +352,10 @@ void Graph::addData(const QVector<datasample_t>&datasamp) {
 					inhibitmask&=~(1<<n);
 				}//but these setting are reset when a new connection is made to a device or a port
 			}
-        		else {	//Normal buttons
+        		else {	//Normal data range
 				channelenablebuttons[n]->setEnabled(true);
-				if(thissample.channelmask&(1<<n))//Channel is enabled
-					channelenablebuttons[n]->setChecked(true);//Reset the button as appropriate
+				//if(thissample.channelmask&(1<<n))//Channel is enabled
+				//	channelenablebuttons[n]->setChecked(true);//Reset the button as appropriate
 				inhibitmask&=~(1<<n);
 				//customPlot_->graph(n)->addData(key, (float)dat/(float)(1<<15));//Data is in the +-1 range
 				customPlot_->graph(7-n)->addData(key, (float)dat*thissample.device_scale_factor);//Data is in millivolts (note reverse order for first 8)

@@ -87,6 +87,7 @@ class connectionManager: public QObject
 		 void lostConnection(void);
 		 void setauxmask(quint8 mask);
 		 void setauxchanmode(bool mode);
+		 void connectionManager::setecgmask(quint8 mask);
 	private:
 		Q_DISABLE_COPY(connectionManager);
 		bool dataDepacket(QByteArray* data, int n, QByteArray* data_output);

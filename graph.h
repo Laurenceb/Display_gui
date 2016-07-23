@@ -58,10 +58,12 @@ public:
   QStatusBar* bar_;
   QPushButton** channelenablebuttons;
   QStringList style_populator; 
+  connectionManager* connection;
   signals:
    void addtofile(datasample_t* data);
    void addtobmp(datasample_t* data);
    void setmask(quint16 mask);
+   void setecgmask_(quint8 mask);
 private slots:
   void realtimeDataSlot();
   void bracketDataSlot();
@@ -82,7 +84,6 @@ private:
   QCPItemText *textLabelbpm;
   qint16 chanmask;
   quint16 holdtime;
-  connectionManager* connection;
   BPMestimator* bpmestimator;
 };
 

@@ -25,7 +25,7 @@ QObject(parent)
 	operatingmode=0;		//Normal mode
 	cable_capacitance=CABLE_CAPACITANCE;
 	state=INIT_STATE_SP1ML;		//The initial "parking" state
-	request_mask=0x00FF;//Initialise with all ECG channels enabled
+	request_mask=0x08FF;//Initialise with all ECG channels enabled
 	workingdatasample.channelmask=0x00FF;//Initialise with all the ECG channels enabled
 	for(qint8 n=0; n<8; n++)
 		workingdatasample.rawquality[n]=LEAD_OFF_MIN_QUALITY/2.0;//Init the quality filter with close to the lowest quality (this inits the filtered value)
@@ -358,6 +358,11 @@ void connectionManager::lostConnection(void) {
 void connectionManager::setChannelMask(quint16 newmask) {//This is a slot used to configure which channels will be plotted
 	for(quint8 m=0;m<100;m++)
 		request_mask=newmask;
+}
+
+void connectionManager::setecgmask(quint8 mask) {//This sets just the lower bits
+	request_mask&=~0x00FF;
+	request_mask|=mask;
 }
 
 void connectionManager::setauxmask(quint8 mask) {

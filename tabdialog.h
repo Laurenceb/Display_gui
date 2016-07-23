@@ -57,6 +57,12 @@ class GraphTab : public QWidget
 public:
     explicit GraphTab(QStatusBar* statusBar__ = 0, PortSelectDialog *connectionDialog=0, FileSelectDialog *fileDialog = 0, QWidget *parent = 0);
     QStatusBar* statusBar_;
+    QPushButton* enablebuttons[8];
+    QButtonGroup* enablebuttonsgroup;//Used to switch ecg telem streams on/off
+    signals:
+      void setecgmask_(quint8 mask);	//Used to set mask
+private slots:
+    void onButSelected(int);
 };
 
 class ConnectionTab : public QWidget

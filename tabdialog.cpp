@@ -72,11 +72,25 @@ TabDialog::TabDialog(const QString &fileName, QWidget *parent)
     mainLayout->addWidget(statusBar_);
     statusBar_->showMessage("Equine ECG, no device connected");
 
+    connect(enablebuttonsgroup, SIGNAL(buttonClicked(int)), this, SLOT(onButSelected(int)));
+    connect(enablebuttonsgroup, SIGNAL(buttonReleased(int)), this, SLOT(onButSelected(int)));//Connect the ECG enable/disable functions to the button click signals
+    connect(this, SIGNAL(setecgmask_(quint8), connectionDialog->, SLOT(quint8));
+
     resize(700,400);
     setMinimumSize(500, 350);
     setLayout(mainLayout);
     setWindowTitle(tr("Equine ECG"));
 }
+
+TabDialog::onButSelected(int unused){
+	quint8 mask=0;
+	for(quint8 m=0; m<8; m++) {
+		if(enablebuttons[n]->isChecked())
+			mask|=(1<<m);	
+	}
+	emit setecgmask_(mask);	//The mask is set in connectionmanager 
+}
+
 
 //This is passed a pointer to the statusbar and the port selection dialog
 GraphTab::GraphTab(QStatusBar* statusBar__, PortSelectDialog *connectionDialog, FileSelectDialog *fileDialog, QWidget *parent)
@@ -93,15 +107,10 @@ GraphTab::GraphTab(QStatusBar* statusBar__, PortSelectDialog *connectionDialog, 
     QFont newFont("Courier", 8, QFont::Bold, true);
     plot_temp->setFont(newFont);
     //Add eight buttons to enable the 8 plot lines. The item in this horizontal set is used to set the graph display time in seconds (-1 sets demo mode) 
-    static QPushButton* enablebuttons[8];
-    enablebuttons[0]= new QPushButton("RA");
-    enablebuttons[1]= new QPushButton("LA");
-    enablebuttons[2]= new QPushButton("LL");
-    enablebuttons[3]= new QPushButton("C1");
-    enablebuttons[4]= new QPushButton("C2");
-    enablebuttons[5]= new QPushButton("C3");
-    enablebuttons[6]= new QPushButton("C4");
-    enablebuttons[7]= new QPushButton("C5");
+    enablebuttonsgroup= new QButtonGroup();
+    QStringList ecg_telem_names;
+    ecg_telem_names << "RA" << "LA" << "LL" << "C1" << "C2" << "C3" << "C4" << "C5";
+    //Configure the stylesheet
     QString stylestring_base;		//Dynamic stylesheets for the buttons
     stylestring_base="QPushButton{font-weight: bold; color: rgba(100,105,120,1.0); background-color: rgba(%1, 0.25); border-style: outset; border-width:2px; border-radius: 6px; border-color: beige} QPushButton:checked{background: qlineargradient(x1: 0, y1: 0, x2: 1, y2: 0, stop: 0 rgba(%1, 1.0), stop: %2 rgba(%1, 1.0), stop: %3 white, stop: 1.0 white); border-color: black}";
     QStringList colorlist;
@@ -114,14 +123,18 @@ GraphTab::GraphTab(QStatusBar* statusBar__, PortSelectDialog *connectionDialog, 
 	styletemplate << tm;		//A string list for the styles
     }
     G->style_populator=styletemplate;
-    for(qint8 n=0; n<8; n++)
+    //Loop through, populating all the buttons. Use the standard titles rather than raw mode titles
+    for(quint8 n=0; n<8; n++) {
+	enablebuttons[n] = new QPushButton(ecg_telem_names.at(n));
+	enablebuttons[n]->setCheckable(true);//the buttons can be turned on/off
 	enablebuttons[n]->setStyleSheet(styletemplate[n].arg("0.99","1.00"));
-    for(int n=0;n<8;n++) {
-	enablebuttons[n]->setCheckable(true);
 	enablebuttons[n]->setChecked(true);//All channels default to enabled
 	enablebuttons[n]->setEnabled(false);//But they are all greyed out
 	hLayout->addWidget(enablebuttons[n]);//Add the button to the horizontal layout
+	enablebuttonsgroup->addButton(enablebuttons[n]);
+	enablebuttonsgroup->setId(enablebuttons[n], n);
     }
+    enablebuttonsgroup->setExclusive(false);
     G->channelenablebuttons=enablebuttons;
     //add some read only explanatory text
     QLabel *echoLabel = new QLabel(tr("Hold time (s):"));
