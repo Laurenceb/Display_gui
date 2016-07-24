@@ -62,7 +62,7 @@ public:
     signals:
       void setecgmask_(quint8 mask);	//Used to set mask
 private slots:
-    void onButSelected(int);
+    void onButSelected(int but);
 };
 
 class ConnectionTab : public QWidget

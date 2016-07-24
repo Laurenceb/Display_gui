@@ -73,6 +73,7 @@ class connectionManager: public QObject
 		QVector<datasample_t> latestdatasamples;	//This can be used to accumulate multiple samples to be added to the graph (allows fps>=2.5)
 		datasample_t workingdatasample;
 		datasample_buff_t datasamplehist;		//Historical sample buffer, used for filtering
+		quint16 request_mask;				//Used to pass requests to the device
 		signals:
 		 void setDTR(bool);
 		 void setRTS(bool);
@@ -87,7 +88,7 @@ class connectionManager: public QObject
 		 void lostConnection(void);
 		 void setauxmask(quint8 mask);
 		 void setauxchanmode(bool mode);
-		 void connectionManager::setecgmask(quint8 mask);
+		 void setecgmask(quint8 mask);
 	private:
 		Q_DISABLE_COPY(connectionManager);
 		bool dataDepacket(QByteArray* data, int n, QByteArray* data_output);
@@ -101,6 +102,5 @@ class connectionManager: public QObject
 		int lastsequencenumber;//Used to track any missed packets and attempt to correct the time accordingly
 		quint8 operatingmode;
         	quint16 cable_capacitance;//Used to pass the capacitance value of the connected cable to the impedance estimator
-		quint16 request_mask;//Used to pass requests to the device
 };
 #endif

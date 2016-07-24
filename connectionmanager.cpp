@@ -25,8 +25,8 @@ QObject(parent)
 	operatingmode=0;		//Normal mode
 	cable_capacitance=CABLE_CAPACITANCE;
 	state=INIT_STATE_SP1ML;		//The initial "parking" state
-	request_mask=0x08FF;//Initialise with all ECG channels enabled
-	workingdatasample.channelmask=0x00FF;//Initialise with all the ECG channels enabled
+	request_mask=0x08FF;		//Initialise with all ECG channels enabled and the "battery" channel on
+	workingdatasample.channelmask=request_mask;//Sets the "parking state" for indicator buttons before a connection is made
 	for(qint8 n=0; n<8; n++)
 		workingdatasample.rawquality[n]=LEAD_OFF_MIN_QUALITY/2.0;//Init the quality filter with close to the lowest quality (this inits the filtered value)
 	latestdatasamples.append(workingdatasample); 
@@ -173,9 +173,10 @@ void connectionManager::connectionStateMachine() {
 			//if(!lastsequencenumber)
 			//	qDebug() << endl << "gap:" << gap;
 			currentestimateddevicetime+=(float)gap/DATA_RATE;//Add to the current estimated device time
+			workingdatasample.channelmask=(readpacket[2])|((quint16)readpacket[3]<<8);//The mask of sent channels
 			//Load the data from the packet string into the sample history struct
 			qint16 tempbuf;				//Used as working buffer for ECG samples
-			qint16 indx=2;				//Starting index of the data (there is a network address and sequence number first)
+			qint16 indx=4;				//Starting index of the data (there is a network address, sequence number, and mask first)
 			qint8 historybufferr=0;
 			for(qint16 n=0; n<16; n++) {		//There are a maximum of 16 channels supported by the protocol
 				if(workingdatasample.channelmask&(1<<n)) {//The current channel is enabled

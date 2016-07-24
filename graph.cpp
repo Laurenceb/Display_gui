@@ -67,7 +67,7 @@ void Graph::setupRealtimeDataDemo(QCustomPlot *customPlot, PortSelectDialog *con
 
   //Connect the aux channel control signals from the connectionDialog to the connectionmanager
   connect(connectionDialog, SIGNAL(setauxmask_(quint8)), connection, SLOT(setauxmask(quint8))/*,Qt::QueuedConnection*/);//set the aux channel mask bits
-  connect(connectionDialog, SIGNAL(setecgmask_(quint8)), connection, SLOT(setecgmask(quint8)));//set only the enabled ecg channels
+  //connect(connectionDialog, SIGNAL(setecgmask_(quint8)), connection, SLOT(setecgmask(quint8)));//This is handled by tabdialog now
   connect(connectionDialog, SIGNAL(setauxchanmode_(bool)), connection, SLOT(setauxchanmode(bool)));//The operating mode
 
   holdtime=14;
@@ -257,7 +257,8 @@ void Graph::realtimeDataSlot()
         	(connection->latestdatasamples[0]).quality[n]=0.6+0.35*qSin(key/2);
       }
       (connection->latestdatasamples[0]).sampletime=key;
-      //(connection->latestdatasamples[0]).channelmask=0x00FF;//The 8 ECG channels are active (little endian on the device) (for the fake data this is disabled)
+      (connection->latestdatasamples[0]).channelmask=connection->request_mask;//Copy the request mask and set it as the channel mask to emulate device functionality
+      //qDebug() << endl << (connection->request_mask&0x01) << (connection->request_mask&0x02) << (connection->request_mask&0x04) << (connection->request_mask&0x08);
       (connection->latestdatasamples[0]).device_scale_factor=1.0/(float)(1<<15);//Around a millivolt of simulated range
       QVector<datasample_t> samples;
       samples.append(connection->latestdatasamples[0]);
@@ -267,48 +268,39 @@ void Graph::realtimeDataSlot()
 
 void Graph::addData(const QVector<datasample_t>&datasamp) {
     static double lastPointKey = 0;
-    static quint16 requestmask = 0x08FF;//This is the set of channels which is enabled 
     static qint16 percent_charged=-1;// The -1 code indicates that there is no valid data
     datasample_t thissample;
     double key=datasamp.last().sampletime;//Time of last sample
     thissample=datasamp.first();
     quint16 tmpmask=thissample.channelmask;
-    for(int n=0;n<8;n++) {//Set the mask according to the checked buttons across the bottom of the graph
-	if(channelenablebuttons[n]->isChecked())//Button needs to be checked
-		tmpmask|=(1<<n);
-	else if(!(inhibitmask&(1<<n)))//Only disable the channel if the inhibit mask is not set
-		tmpmask&=~(1<<n);
-	//The first 5 lines use a dotted line style, it is important to offset the pattern appropriatly. Do this before any new data added, as it will distort axes
-	if(n<5) {
-		QPen thepen=customPlot_->graph(n)->pen();
-		double offsetvalue=thepen.dashOffset();//retrieve current offset
-		QVector<qreal> pattern=thepen.dashPattern();
-		double dashlength=0;
-		for (int i = 0; i < pattern.size(); i++)
-			dashlength+=pattern.at(i);//The length of the dashes
-		dashlength*=thepen.widthF();	//dashes are in units of pen width, convert to pixels
-		offsetvalue*=thepen.widthF();	//also in pixel units
-		//Add the plot length of the removed data to the offsetvalue, looping through all points that are due to be removed
-		const QCPDataMap *dataMap = customPlot_->graph(n)->data();//Read the raw data from the graph
-		QMap<double, QCPData>::const_iterator i = dataMap->constBegin();
-		double x,y,x_old,y_old;
-		while (i != dataMap->constEnd()) {//break once we reach the limit, need to include one more datapt
-			x=customPlot_->xAxis->coordToPixel(i.value().key);
-			y=customPlot_->yAxis->coordToPixel(i.value().value);
-			if(i != dataMap->constBegin())
-				offsetvalue+=sqrt(((x-x_old)*(x-x_old))+((y-y_old)*(y-y_old)));//Distance in pixel units
-			x_old=x;
-			y_old=y;
-			if(i.value().key>=(key-holdtime))//We have passed the trim limit and reached the first not chopped data point
-				break;
-			i++;
-		}
-		offsetvalue=fmod(offsetvalue,dashlength);//modulo the offset with the dash length
-		thepen.setDashOffset(offsetvalue/thepen.widthF());//convert back to dash units
-		customPlot_->graph(n)->setPen(thepen);//The pattern offset is continually adjusted to match the data
+    for(int n=0;n<5;n++) {//The dash pattern needs to move with the data for the first 5 traces
+	QPen thepen=customPlot_->graph(n)->pen();
+	double offsetvalue=thepen.dashOffset();//retrieve current offset
+	QVector<qreal> pattern=thepen.dashPattern();
+	double dashlength=0;
+	for (int i = 0; i < pattern.size(); i++)
+		dashlength+=pattern.at(i);//The length of the dashes
+	dashlength*=thepen.widthF();	//dashes are in units of pen width, convert to pixels
+	offsetvalue*=thepen.widthF();	//also in pixel units
+	//Add the plot length of the removed data to the offsetvalue, looping through all points that are due to be removed
+	const QCPDataMap *dataMap = customPlot_->graph(n)->data();//Read the raw data from the graph
+	QMap<double, QCPData>::const_iterator i = dataMap->constBegin();
+	double x,y,x_old,y_old;
+	while (i != dataMap->constEnd()) {//break once we reach the limit, need to include one more datapt
+		x=customPlot_->xAxis->coordToPixel(i.value().key);
+		y=customPlot_->yAxis->coordToPixel(i.value().value);
+		if(i != dataMap->constBegin())
+			offsetvalue+=sqrt(((x-x_old)*(x-x_old))+((y-y_old)*(y-y_old)));//Distance in pixel units
+		x_old=x;
+		y_old=y;
+		if(i.value().key>=(key-holdtime))//We have passed the trim limit and reached the first not chopped data point
+			break;
+		i++;
 	}
+	offsetvalue=fmod(offsetvalue,dashlength);//modulo the offset with the dash length
+	thepen.setDashOffset(offsetvalue/thepen.widthF());//convert back to dash units
+	customPlot_->graph(n)->setPen(thepen);//The pattern offset is continually adjusted to match the data
     }
-    emit setmask(tmpmask);
     QString txt_bot=QString("RLD remap:");
     QString txt_top=QString("Lead off:");
     QStringList electrodes;
@@ -333,7 +325,6 @@ void Graph::addData(const QVector<datasample_t>&datasamp) {
 					}
 					channelenablebuttons[n]->setEnabled(true);
 					channelenablebuttons[n]->setChecked(false);
-					inhibitmask|=(1<<n);
 				}
 				else if(dat==-(1<<15)) {//Missing electrode at the top, but only if its not a disabled channel (which has code of lower limit +1)
 					if(!textlabelplaced[n]) {
@@ -344,19 +335,18 @@ void Graph::addData(const QVector<datasample_t>&datasamp) {
 					}
 					channelenablebuttons[n]->setEnabled(true);
 					channelenablebuttons[n]->setChecked(false);
-					inhibitmask|=(1<<n);
 				}
 				else if(dat==-(1<<15)+1) {//A channel that is disabled at the device end
 					channelenablebuttons[n]->setChecked(false);//Disable the channel to free up capacity
 					channelenablebuttons[n]->setEnabled(false);//Set the buttons of disabled channels as greyed out. It is assumed config doesnt change
-					inhibitmask&=~(1<<n);
 				}//but these setting are reset when a new connection is made to a device or a port
 			}
         		else {	//Normal data range
 				channelenablebuttons[n]->setEnabled(true);
-				//if(thissample.channelmask&(1<<n))//Channel is enabled
-				//	channelenablebuttons[n]->setChecked(true);//Reset the button as appropriate
-				inhibitmask&=~(1<<n);
+				if(thissample.channelmask&(1<<n))//Channel is enabled
+					channelenablebuttons[n]->setChecked(true);//Reset the button as appropriate
+				else
+					channelenablebuttons[n]->setChecked(false);//To indicate that there is no contents
 				//customPlot_->graph(n)->addData(key, (float)dat/(float)(1<<15));//Data is in the +-1 range
 				customPlot_->graph(7-n)->addData(key, (float)dat*thissample.device_scale_factor);//Data is in millivolts (note reverse order for first 8)
         			customPlot_->graph(n+8)->clearData();    // set data of dots: 

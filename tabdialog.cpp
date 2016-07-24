@@ -72,23 +72,10 @@ TabDialog::TabDialog(const QString &fileName, QWidget *parent)
     mainLayout->addWidget(statusBar_);
     statusBar_->showMessage("Equine ECG, no device connected");
 
-    connect(enablebuttonsgroup, SIGNAL(buttonClicked(int)), this, SLOT(onButSelected(int)));
-    connect(enablebuttonsgroup, SIGNAL(buttonReleased(int)), this, SLOT(onButSelected(int)));//Connect the ECG enable/disable functions to the button click signals
-    connect(this, SIGNAL(setecgmask_(quint8), connectionDialog->, SLOT(quint8));
-
     resize(700,400);
     setMinimumSize(500, 350);
     setLayout(mainLayout);
     setWindowTitle(tr("Equine ECG"));
-}
-
-TabDialog::onButSelected(int unused){
-	quint8 mask=0;
-	for(quint8 m=0; m<8; m++) {
-		if(enablebuttons[n]->isChecked())
-			mask|=(1<<m);	
-	}
-	emit setecgmask_(mask);	//The mask is set in connectionmanager 
 }
 
 
@@ -124,6 +111,7 @@ GraphTab::GraphTab(QStatusBar* statusBar__, PortSelectDialog *connectionDialog, 
     }
     G->style_populator=styletemplate;
     //Loop through, populating all the buttons. Use the standard titles rather than raw mode titles
+    enablebuttonsgroup->setExclusive(false);
     for(quint8 n=0; n<8; n++) {
 	enablebuttons[n] = new QPushButton(ecg_telem_names.at(n));
 	enablebuttons[n]->setCheckable(true);//the buttons can be turned on/off
@@ -134,7 +122,6 @@ GraphTab::GraphTab(QStatusBar* statusBar__, PortSelectDialog *connectionDialog, 
 	enablebuttonsgroup->addButton(enablebuttons[n]);
 	enablebuttonsgroup->setId(enablebuttons[n], n);
     }
-    enablebuttonsgroup->setExclusive(false);
     G->channelenablebuttons=enablebuttons;
     //add some read only explanatory text
     QLabel *echoLabel = new QLabel(tr("Hold time (s):"));
@@ -149,9 +136,11 @@ GraphTab::GraphTab(QStatusBar* statusBar__, PortSelectDialog *connectionDialog, 
     G->setupRealtimeDataDemo(plot_temp,connectionDialog,fileDialog);//There is a horizontal set of buttons across the bottom
     plot_temp->replot();
     vLayout->addLayout(hLayout);
+    connect(enablebuttonsgroup, SIGNAL(buttonClicked(int)), this, SLOT(onButSelected(int)));
+    connect(enablebuttonsgroup, SIGNAL(buttonReleased(int)), this, SLOT(onButSelected(int)));//Connect the ECG enable/disable functions to the button click signals
+    connect(this, SIGNAL(setecgmask_(quint8)), G->connection, SLOT(setecgmask(quint8)));//Sets the mask
     setLayout(vLayout);
 }
-
 
 /*LoggingTab::LoggingTab(const QFileInfo &fileInfo, QWidget *parent)//TODO: remove filename argument? Or have this as the current path?
     : QWidget(parent)
@@ -191,4 +180,13 @@ GraphTab::GraphTab(QStatusBar* statusBar__, PortSelectDialog *connectionDialog, 
     setLayout(mainLayout);
 	//TODO setup a timer with callback to update the file info, or have another set of files and classes?
 }*/
+
+void GraphTab::onButSelected(int but){
+	static quint8 mask=0xFF;
+	if(enablebuttons[but]->isChecked())//Only look at the clicked button
+		mask|=(1<<but);
+	else	
+		mask&=~(1<<but);
+	emit setecgmask_(mask);	//The mask is set in connectionmanager 
+}
 
