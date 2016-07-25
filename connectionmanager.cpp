@@ -278,18 +278,18 @@ connectionManager::~connectionManager()
 
 //This returns true if the a valid packet is found. The argument n is a helper to give an idea of how big the payload should be (excludes net & sync), set 0 to ignore
 //Extracts a single payload starting from the left
-bool connectionManager::dataDepacket(QByteArray* data, int n, QByteArray* data_output) {//Correctly packet format HEAD, network id, sequence number, followed by data
+bool connectionManager::dataDepacket(QByteArray* data, int n, QByteArray* data_output) {//Correctly packet format: HEAD, network id, sequence number, mask, data, COBS
 	int s=0;
 	s=data->indexOf(HEAD,0);//Find the first packet header
 	if(s>=0)
 		*data=data->right(data->size()-s);//Trim off the start of the string, i.e. everything up to the packet header. This should avoid sync issues
 	else
 		return false;	//no header found
-	if(n && ( data->size()<(n+4) || ( (data->size()>(n+4))&&(data->at(n+4)!=HEAD) ) )) {//Three bytes of header plus a byte for the COBS initialisation
+	if(n && ( data->size()<(n+6) || ( (data->size()>(n+6))&&(data->at(n+6)!=HEAD) ) )) {//Five bytes of header plus a byte for the COBS initialisation
 		if(data->indexOf(HEAD,1)>40)//Only abort if there are no other packets within 40 bytes. Allows packet length to change at runtime (between requests)
 			return false;	//There cannot be a matching packet contained within. 
 	}
-	if(data->size()<4)
+	if(data->size()<6)
 		return false;	//Nothing useful in the buffer (yet)
 	int skip;		//The initial skip value (candidate, as we don't know if we have a complete packet yet - service name reply is of unknown length)
 	int index=data->indexOf(HEAD,1)-1;//The next index
