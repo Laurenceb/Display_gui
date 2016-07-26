@@ -6,7 +6,7 @@ SerialPort::SerialPort(QObject *parent) :
 QObject(parent)
 {
 	port = new QSerialPort(this);
-	connect(port, &QSerialPort::readyRead, this, &SerialPort::onDataAvailable);//There is some received data in the serial port buffer
+	//connect(port, &QSerialPort::readyRead, this, &SerialPort::onDataAvailable);//There is some received data in the serial port buffer
 	connect(port, (void (QSerialPort::*)(QSerialPort::SerialPortError))&QSerialPort::error, this, &SerialPort::onError);
 	connect(port, &QSerialPort::bytesWritten, this, &SerialPort::processWritten);//The transmit buffer is now empty
 }
@@ -61,6 +61,7 @@ void SerialPort::onDataAvailable()
 {
 	// append new data to buffer
 	QByteArray arr=port->readAll();
+qDebug() << "," << arr.count() << ",";
 	for(int i=0; i<arr.count(); i++) {//Loop through the character array, placing all received characters into the queue
 		queue_.enqueue(arr.at(i));
 	}
@@ -84,6 +85,7 @@ void SerialPort::onDataAvailable()
 
 void SerialPort::writeBytes(QByteArray * byteArray) {
 	port->write(*byteArray);//this is a non blocking write
+	port->flush();		//non blocking, bypasses internal buffer
 }
 
 void SerialPort::processWritten() {

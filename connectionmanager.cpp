@@ -150,6 +150,7 @@ void connectionManager::connectionStateMachine() {
 			transmitbuffer.append(QString::asprintf("%02x",requests));//Zero padded hex
 			transmitbuffer.append(QString::asprintf("%04x",request_mask));//16 bit int as 4 hex characters
 			emit sendData(&transmitbuffer);
+			qDebug() << endl << "#" << fmod(secondsSinceEpoch,100.0);
 		}
 		internaltimeout--;
 		emit readAsString(&receivebuffer);
@@ -159,6 +160,7 @@ void connectionManager::connectionStateMachine() {
 			count+=(request_mask&(1<<n))?1:0;
 		quint8 foundapacket=0;
 		while(dataDepacket(&receivebuffer, count*2, &readpacket)) {//A packet was found, process it (count is number of channels, add two byte overhead)
+			//qDebug() << endl << fmod(secondsSinceEpoch,100.0);
 			if(!connectiontype && !workingdatasample.device_scale_factor)
 				workingdatasample.device_scale_factor=ADC_SCALE_FACTOR/(float)readpacket[1];//Populate this using the first sequence number
 			double timegap=secondsSinceEpoch-timelastpacket;//This should be rounded to the nearest GUI refresh interval, also serial delay to consider
@@ -173,7 +175,7 @@ void connectionManager::connectionStateMachine() {
 			//if(!lastsequencenumber)
 			//	qDebug() << endl << "gap:" << gap;
 			currentestimateddevicetime+=(float)gap/DATA_RATE;//Add to the current estimated device time
-			workingdatasample.channelmask=(readpacket[2])|((quint16)readpacket[3]<<8);//The mask of sent channels
+			workingdatasample.channelmask=((((quint16)readpacket[3])&0xFF)<<8)|((quint16)(readpacket[2])&0xFF);//The mask of sent channels
 			//Load the data from the packet string into the sample history struct
 			qint16 tempbuf;				//Used as working buffer for ECG samples
 			qint16 indx=4;				//Starting index of the data (there is a network address, sequence number, and mask first)
@@ -182,12 +184,12 @@ void connectionManager::connectionStateMachine() {
 				if(workingdatasample.channelmask&(1<<n)) {//The current channel is enabled
 					if((indx+1)>=readpacket.size()) {
 						historybufferr=1;	//Mark this as an error
-						//qDebug() << endl << "indx" << indx << readpacket.size();
+						qDebug() << endl << "indx" << indx << readpacket.size() << workingdatasample.channelmask << (int)(readpacket[2]) << (int)(readpacket[3]);
 						//qDebug() << endl << readpacket.size() << indx;
 						break;			//This should not happen
 					}
 					if(n<8) {		//If this is an ECG channel, run the filters to strip the ECG from the lead-off signal
-						tempbuf=(readpacket[indx])|((quint16)readpacket[indx+1]<<8);//The current sample
+						tempbuf=((((quint16)readpacket[indx+1])&0xFF)<<8)|((quint16)(readpacket[indx])&0xFF);//The current sample
 						//qDebug() << endl << tempbuf ;
 						qint16 difference=(int)((quint8)(readpacket[1]))-datasamplehist.indices[n][1];
 						if(difference<0)
@@ -257,6 +259,7 @@ void connectionManager::connectionStateMachine() {
 		}
 		if(!foundapacket) {
 			if(secondsSinceEpoch>(timelastpacket+((secondsSinceEpoch<(connectiontime+TIMEOUT_TRANSITION))?TIMEOUT_ONE:TIMEOUT_TWO))) {
+				qDebug() << endl << "re-entry";
 				if(connectiontype==1)		//causes the connection state to be reset so that nopefully a new connection can be made
 					state=INIT_STATE_SP1ML;	//A long interval with nothing found (about 2 minutes during runtime, and 10 seconds at boot)
 				else if(connectiontype==0)

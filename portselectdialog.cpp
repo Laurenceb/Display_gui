@@ -234,9 +234,10 @@ void PortSelectDialog::emptyRxBuffer(void) {//Empties the Rx buffer, only use if
 }
 
 void PortSelectDialog::readAsString(QByteArray* data) {
-	while(!(the_port->queue_.isEmpty())) {
-		data->append(the_port->queue_.dequeue());//Dump the data and put it into the string
-	}
+	//while(!(the_port->queue_.isEmpty())) {
+	//	data->append(the_port->queue_.dequeue());//Dump the data and put it into the string
+	//}
+	data->append(the_port->port->readAll());
 }
 
 /*void PortSelectDialog::emptyRxBuffer(void) {

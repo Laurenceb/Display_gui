@@ -23,6 +23,7 @@ class SerialPort : public QObject
 		void setRTS(bool RTS);
 		void setDTR(bool DTR);
 		QQueue<unsigned char> queue_;//Used for data output
+		QSerialPort *port;
 		signals:
 		 void portOpened();
 		 void portClosed();
@@ -33,7 +34,7 @@ class SerialPort : public QObject
 	private slots:
 		void onDataAvailable();
 		void onError(QSerialPort::SerialPortError serialPortError);
-	private:
-		QSerialPort *port;
+	//private:
+	//	QSerialPort *port;
 };
 #endif // SERIALPORT_H

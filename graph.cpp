@@ -226,6 +226,8 @@ void Graph::realtimeDataSlot()
 {
     //int i=customPlot_->graphCount();//Number of graph elements on the plot (not currently used)
     double key;
+key = QDateTime::currentDateTime().toMSecsSinceEpoch()/1000.0;
+qDebug() << endl << fmod(key,100.0) << ',';
     // calculate two new data points:
 #if QT_VERSION < QT_VERSION_CHECK(4, 7, 0)
     double key = 0;
@@ -264,6 +266,8 @@ void Graph::realtimeDataSlot()
       samples.append(connection->latestdatasamples[0]);
       addData(samples);//Add the plot data directly
     }
+key = QDateTime::currentDateTime().toMSecsSinceEpoch()/1000.0;
+qDebug() << fmod(key,100.0);
 }
 
 void Graph::addData(const QVector<datasample_t>&datasamp) {
