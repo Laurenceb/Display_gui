@@ -347,10 +347,7 @@ void Graph::addData(const QVector<datasample_t>&datasamp) {
 			}
         		else {	//Normal data range
 				channelenablebuttons[n]->setEnabled(true);
-				if(thissample.channelmask&(1<<n))//Channel is enabled
-					channelenablebuttons[n]->setChecked(true);//Reset the button as appropriate
-				else
-					channelenablebuttons[n]->setChecked(false);//To indicate that there is no contents
+				channelenablebuttons[n]->setChecked(true);//Reset the button as appropriate
 				//customPlot_->graph(n)->addData(key, (float)dat/(float)(1<<15));//Data is in the +-1 range
 				customPlot_->graph(7-n)->addData(key, (float)dat*thissample.device_scale_factor);//Data is in millivolts (note reverse order for first 8)
         			customPlot_->graph(n+8)->clearData();    // set data of dots: 
@@ -366,6 +363,7 @@ void Graph::addData(const QVector<datasample_t>&datasamp) {
 			}
 		}
 		else {//This plot line and indicator point needs to be removed from the graph
+			channelenablebuttons[n]->setChecked(false);//To indicate that there is no contents
 			customPlot_->graph(7-n)->clearData();//Remove all the plotline data for disabled plots
 			customPlot_->graph(n+8)->clearData();//Remove the plot point as well
 		}
