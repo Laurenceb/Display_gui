@@ -77,6 +77,8 @@ void PortSelectDialog::drawRadioButtons()
 	static int n=0;//Stores how many times we have run
 	static QString portnames=QString("");//Used to detected changed config
 	static QList<QSerialPortInfo> OldserialPortInfo;
+	if(the_port->isOpen())
+		return;			//No need to do anything if already connect, also this seems to break the port
 	//Find all the suitable serial ports and add appropriate buttons to the layout
 	QList<QSerialPortInfo> serialPortInfoList = QSerialPortInfo::availablePorts();
 	QString portstring=QString("");
@@ -197,6 +199,7 @@ void PortSelectDialog::onAccepted()
 	if(ports.at(checked_id).description().contains(cp2102) || ports.at(checked_id).description().contains(sp1ml)) {
 		devicetype=1;	//Type 1 is the SP1ML, currently only two types, basic serial and SP1ML
 	}
+	m_button->setText("Connected (click to reconnect)");	
 	emit newConnection(devicetype);
 }
 
@@ -228,6 +231,11 @@ void PortSelectDialog::setDTR(bool DTR)//Currently unused, as pin is not broken 
 }
 
 void PortSelectDialog::emptyRxBuffer(void) {//Empties the Rx buffer, only use if really essential, so as to 
+	QByteArray arr=the_port->port->readAll();
+	//qDebug() << "," << arr.count() << ",";
+	for(int i=0; i<arr.count(); i++) {//Loop through the character array, placing all received characters into the queue
+		the_port->queue_.enqueue(arr.at(i));
+	}
 	while(!(the_port->queue_.isEmpty())) {
 		the_port->queue_.dequeue();//Dump the data and do nothing with it
 	}

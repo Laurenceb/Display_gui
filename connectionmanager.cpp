@@ -81,7 +81,7 @@ void connectionManager::connectionStateMachine() {
 		state++;
 		break;
 	case INIT_STATE_SP1ML+2:
-		emit setRTS(true);		//Enter command mode before remapping the destination address on the usb dongle
+		emit setRTS(false);		//Enter command mode before remapping the destination address on the usb dongle
 		state++;
 		internaltimeout=2;
 		break;				//Need to wait for a single iteration for the setting to take effect
@@ -102,14 +102,14 @@ void connectionManager::connectionStateMachine() {
 			transmitbuffer.clear();
 			transmitbuffer.append("ATO\n\r");//Exit the command mode
 			emit sendData(&transmitbuffer);
-			emit setRTS(false);		//Exit command mode (also needs command to be sent)
+			emit setRTS(true);		//Exit command mode (also needs command to be sent)
 			state++;
 		}
         	else if(internaltimeout--) {
         		state=INIT_STATE_SP1ML+3;
         	}
 		else {
-			emit setRTS(false);	//Try cycling the RTS pin level
+			emit setRTS(true);	//Try cycling the RTS pin level
 			state=INIT_STATE_SP1ML+2;
 		}
 		break;
@@ -125,7 +125,7 @@ void connectionManager::connectionStateMachine() {
         		state=INIT_STATE_SP1ML+3;
         	}
 		else {
-			emit setRTS(false);	//Try cycling the RTS pin level
+			emit setRTS(true);	//Try cycling the RTS pin level
 			state=INIT_STATE_SP1ML+2;
 		}
 		break;
@@ -297,9 +297,10 @@ bool connectionManager::dataDepacket(QByteArray* data, int n, QByteArray* data_o
 	int skip;		//The initial skip value (candidate, as we don't know if we have a complete packet yet - service name reply is of unknown length)
 	int index=data->indexOf(HEAD,1)-1;//The next index
 	int siz;
-	if(index<0)		//Nothing found
-		//index=data->size()-1;//Go to the end of the string
-		return false;	//There must always be at least the first byte of a second packet in the buffer
+	if(index<0)		//Nothing found 
+		index=data->size()-1;//Go to the end of the string
+		if(n)		//(only enable this if there is a packet length argument)
+			return false;//There must always be at least the first byte of a second packet in the buffer
 	siz=index+1;		//The size in bytes
 	*data_output=data->mid(0,siz);//Copy to the output, only the output is manipulated here
 	//qDebug() << endl << (((*data_output))).toHex();
@@ -342,7 +343,7 @@ void connectionManager::setDeviceDescriptor(QByteArray* name) {
 void connectionManager::newConnection(int type) {
 	connection=true;
 	connectiontype=type;
-	emit setRTS(false);	//RTS to logic 1==normal mode. Init as normal mode (SP1ML will init from its EEPROM)
+	emit setRTS(true);	//RTS to logic 1==normal mode. Init as normal mode (SP1ML will init from its EEPROM)
 	if(type==1)//^ It is not clear why the levels need to be as above (seems to be inverted?)
 		state=INIT_STATE_SP1ML;//Reset the state as appropriate
 	else {

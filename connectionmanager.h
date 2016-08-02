@@ -20,7 +20,7 @@
 #define INIT_STATE_RN42 ENTRY_STATE;
 
 #define DATA_RATE 250.0
-#define INTERNAL_REQUEST_INTERVAL 0.2
+#define INTERNAL_REQUEST_INTERVAL 0.3
 #define DATA_OVER_REQUEST 3 /*We always request three times as much data as we need. This allows two transmitted packets in a row to be lost*/
 //^ note that the product of these three numbers should be less than or equal to 255, so it can fit into a single unsigned byte argument
 
