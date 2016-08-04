@@ -304,10 +304,11 @@ bool connectionManager::dataDepacket(QByteArray* data, int n, QByteArray* data_o
 	int skip;		//The initial skip value (candidate, as we don't know if we have a complete packet yet - service name reply is of unknown length)
 	int index=data->indexOf(HEAD,1)-1;//The next index
 	int siz;
-	if(index<0)		//Nothing found 
+	if(index<0) {		//Nothing found 
 		index=data->size()-1;//Go to the end of the string
 		if(n)		//(only enable this if there is a packet length argument)
 			return false;//There must always be at least the first byte of a second packet in the buffer
+	}
 	siz=index+1;		//The size in bytes
 	*data_output=data->mid(0,siz);//Copy to the output, only the output is manipulated here
 	//qDebug() << endl << (((*data_output))).toHex();
