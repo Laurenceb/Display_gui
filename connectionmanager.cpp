@@ -59,10 +59,10 @@ void connectionManager::connectionStateMachine() {
 		transmitbuffer.clear();
 		emit readAsString(&receivebuffer);
 		if(dataDepacket(&receivebuffer, 0, &readpacket)) {//If something was read (any following packets are left in the buffer)
-			for(quint8 m=0; m<100; m++)
-				workingdatasample.device_scale_factor=ADC_SCALE_FACTOR/(float)readpacket[2];//First arg byte (after address and sequence) is gain
+			workingdatasample.device_scale_factor=ADC_SCALE_FACTOR/(float)readpacket[2];//First arg byte (after address and sequence) is gain
 			connectedDeviceName=readpacket.right(readpacket.size()-3);//Process the device name (first byte is the gain setting)
 			connectedDeviceName.insert(0,QByteArray("ISM:"));//The name that is actually displayed in the GUI is proceeded by "ISM:"
+			qDebug() << endl << "'" <<connectedDeviceName << "'" << " Has connected" ;
 			emit setDeviceDescriptor(&connectedDeviceName);
 		}
 		else {
@@ -119,7 +119,12 @@ void connectionManager::connectionStateMachine() {
 			receivebuffer.clear();
 			transmitbuffer.clear();
 			internaltimeout=0;	//This is used for request management once the device enters normal mode
-			goto ENTRY_STATE_;	//We continue into the data loop state (todo impliment support for multiple devices?)
+			if(SP1MLnetworkaddress>=LOWEST_ADDRESS)//A non re-entry situation
+				goto ENTRY_STATE_;	//We continue into the data loop state (todo impliment support for multiple devices?)
+			else {
+				state=INIT_STATE_SP1ML;//Go to entry
+				break;
+			}
 		}
         	else if(internaltimeout--) {
         		state=INIT_STATE_SP1ML+3;
@@ -150,7 +155,7 @@ void connectionManager::connectionStateMachine() {
 			transmitbuffer.append(QString::asprintf("%02x",requests));//Zero padded hex
 			transmitbuffer.append(QString::asprintf("%04x",request_mask));//16 bit int as 4 hex characters
 			emit sendData(&transmitbuffer);
-			qDebug() << endl << "#" << fmod(secondsSinceEpoch,100.0);
+			//qDebug() << endl << "#" << fmod(secondsSinceEpoch,100.0);
 		}
 		internaltimeout--;
 		emit readAsString(&receivebuffer);
@@ -260,8 +265,10 @@ void connectionManager::connectionStateMachine() {
 		if(!foundapacket) {
 			if(secondsSinceEpoch>(timelastpacket+((secondsSinceEpoch<(connectiontime+TIMEOUT_TRANSITION))?TIMEOUT_ONE:TIMEOUT_TWO))) {
 				qDebug() << endl << "re-entry";
-				if(connectiontype==1)		//causes the connection state to be reset so that nopefully a new connection can be made
-					state=INIT_STATE_SP1ML;	//A long interval with nothing found (about 2 minutes during runtime, and 10 seconds at boot)
+				if(connectiontype==1) {		//causes the connection state to be reset so that nopefully a new connection can be made
+					state=INIT_STATE_SP1ML+2;	//A long interval with nothing found (about 2 minutes during runtime, and 10 seconds at boot)
+					SP1MLnetworkaddress=LOWEST_ADDRESS;//Loop back around
+				}
 				else if(connectiontype==0)
 					state=ENTRY_STATE;	//A simple re-entry, no need to establish a new connection
 			}
