@@ -164,7 +164,9 @@ void connectionManager::connectionStateMachine() {
 		for(qint16 n=0;n<16;n++)
 			count+=(request_mask&(1<<n))?1:0;
 		quint8 foundapacket=0;
-		while(dataDepacket(&receivebuffer, count*2, &readpacket)) {//A packet was found, process it (count is number of channels, add two byte overhead)
+		//qDebug() << endl << receivebuffer;
+		//receivebuffer.clear();
+		while(/*0&&*/dataDepacket(&receivebuffer, count*2, &readpacket)) {//A packet was found, process it (count is number of channels, add two byte overhead)
 			//qDebug() << endl << fmod(secondsSinceEpoch,100.0);
 			if(!connectiontype && !workingdatasample.device_scale_factor)
 				workingdatasample.device_scale_factor=ADC_SCALE_FACTOR/(float)readpacket[1];//Populate this using the first sequence number
@@ -179,6 +181,7 @@ void connectionManager::connectionStateMachine() {
 			gap+=gapt;	
 			//if(!lastsequencenumber)
 			//	qDebug() << endl << "gap:" << gap;
+qDebug() << endl << "cnt:" << (int)((quint8)readpacket[1]);
 			currentestimateddevicetime+=(float)gap/DATA_RATE;//Add to the current estimated device time
 			workingdatasample.channelmask=((((quint16)readpacket[3])&0xFF)<<8)|((quint16)(readpacket[2])&0xFF);//The mask of sent channels
 			//Load the data from the packet string into the sample history struct
@@ -239,7 +242,7 @@ void connectionManager::connectionStateMachine() {
 						else {
 							historybufferr=2;//There was a problem filtering the data due to missing packets
 							//qDebug() << endl << "Missed packet" << n;
-							qDebug() << endl << abs((datasamplehist.indices[n][1]-(int)((quint8)(readpacket[1])))%256);
+							//qDebug() << endl << abs((datasamplehist.indices[n][1]-(int)((quint8)(readpacket[1])))%256);
 						}
 						for(qint8 h=3; h; h--) {//Loop through the sample and index delay buffer
 							datasamplehist.samples[n][h]=datasamplehist.samples[n][h-1];//Shift the history buffer

@@ -12,6 +12,9 @@
 #define CP2102_DEVICE_DESCRIPTOR "CP2102 USB to UART Bridge"
 #define SP1ML_DEVICE_DESCRIPTOR "ECG dongle"
 
+//This is the FTDI based RN42 dongle
+#define RN_42_DONGLE_DESCRIPTOR "FT232R USB"
+
 class QTextEdit;
 class QButtonGroup;
 class PortSelectDialog : public QDialog

@@ -194,10 +194,15 @@ void PortSelectDialog::onAccepted()
 	the_port->open();
 	QString sp1ml=QString(SP1ML_DEVICE_DESCRIPTOR);//Use this to test if the connected port is a SP1ML device (using CP2102)
 	QString cp2102=QString(CP2102_DEVICE_DESCRIPTOR);
+	QString rn42=QString(RN_42_DONGLE_DESCRIPTOR);//FTDI dongle with RN-42 on it
 	int devicetype=0;	//Normal device type is type 0
 	//The sp1ml device descriptor (defined in the header), is part of this device descriptor
 	if(ports.at(checked_id).description().contains(cp2102) || ports.at(checked_id).description().contains(sp1ml)) {
-		devicetype=1;	//Type 1 is the SP1ML, currently only two types, basic serial and SP1ML
+		devicetype=1;	//Type 1 is the SP1ML, currently three types, basic serial (0), SP1ML (1), and RN-42 dongle (2)
+	}
+	if(ports.at(checked_id).description().contains(rn42)) {
+		devicetype=2;	//Type 2 is the RN42 dongle
+		the_port->setKeepOpen(false);//This should be set false to avoid io errors on rfcomm devices 
 	}
 	m_button->setText("Connected (click to reconnect)");	
 	emit newConnection(devicetype);
