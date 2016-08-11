@@ -157,7 +157,7 @@ void PortSelectDialog::drawRadioButtons()
 		}
 		numberofserialports=i;			//Store number of serial ports for reference
 		foreach(const QString &Bt, *BlueToothNames) {//Then loop through the Bluetooth devices
-			QRadioButton *btn = new QRadioButton();
+			QRadioButton *btn = new QRadioButton(Bt);
 			if(checked_id!=-1 && !QString::compare(Bt,name,Qt::CaseInsensitive)) {
 				btn->setChecked(true);//If the port configuration changes, the ticked button will still be the one we are connected to (if connected)
 			}
@@ -214,9 +214,10 @@ void PortSelectDialog::onAccepted()
 	QList<QSerialPortInfo> ports = QSerialPortInfo::availablePorts();//Use this to check the description of the selected port
 	//qDebug() << "openDevice" << ports.at(checked_id).portName();
 	//emit openDevice(ports.at(checked_id).portName());
-	if(the_port->isOpen()) {//Close the port if it is open, before reopening after setting the name
+	if(the_port->isOpen())//Close the port if it is open, before reopening after setting the name
 		the_port->close();
-	}
+	else if(the_bt->Connection)
+		the_bt->Disconnect();
 	if(checked_id<numberofserialports) {//We have to open a Serial device
 		portname=portnamelist.at(checked_id);//Store this for future reference, name of the current port
 		the_port->setName(portname);
@@ -299,6 +300,7 @@ void PortSelectDialog::readAsString(QByteArray* data) {
 	if(the_port->isOpen())
 		data->append(the_port->port->readAll());
 	else if(the_bt->Connection) {
+		the_bt->ReceiveAvailableData();
 		while(!(the_bt->queue_.isEmpty()))
 			data->append(the_bt->queue_.dequeue());
 	}

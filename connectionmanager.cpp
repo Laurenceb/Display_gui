@@ -268,11 +268,11 @@ qDebug() << endl << "cnt:" << (int)((quint8)readpacket[1]);
 		if(!foundapacket) {
 			if(secondsSinceEpoch>(timelastpacket+((secondsSinceEpoch<(connectiontime+TIMEOUT_TRANSITION))?TIMEOUT_ONE:TIMEOUT_TWO))) {
 				qDebug() << endl << "re-entry";
-				if(connectiontype==1) {		//causes the connection state to be reset so that nopefully a new connection can be made
+				if(connectiontype==SP1ML) {	//causes the connection state to be reset so that nopefully a new connection can be made
 					state=INIT_STATE_SP1ML+2;	//A long interval with nothing found (about 2 minutes during runtime, and 10 seconds at boot)
 					SP1MLnetworkaddress=LOWEST_ADDRESS;//Loop back around
 				}
-				else if(connectiontype==0)
+				else if(connectiontype==BT || connectiontype==RN42)
 					state=ENTRY_STATE;	//A simple re-entry, no need to establish a new connection
 			}
 		}
@@ -354,9 +354,10 @@ void connectionManager::setDeviceDescriptor(QByteArray* name) {
 void connectionManager::newConnection(int type) {
 	connection=true;
 	connectiontype=type;
-	emit setRTS(true);	//RTS to logic 1==normal mode. Init as normal mode (SP1ML will init from its EEPROM)
-	if(type==SP1ML)//^ It is not clear why the levels need to be as above (seems to be inverted? - From xperiments seems API logic levels are == TTL levels)
+	if(type==SP1ML) {//^ It is not clear why the levels need to be as above (seems to be inverted? - From xperiments seems API logic levels are == TTL levels)
+		emit setRTS(true);	//RTS to logic 1==normal mode. Init as normal mode (SP1ML will init from its EEPROM)
 		state=INIT_STATE_SP1ML;//Reset the state as appropriate
+	}
 	else {
 		state=INIT_STATE_RN42;//Note that in future if RN42 via usb-serial dongle is added, another entry state may be needed to allow for Inquiry scanning
 		connectedDeviceName=QByteArray("Bluetooth or serial device");//Process the device name (this is used to update the GUI)

@@ -10,6 +10,7 @@ QObject(parent)
 	DiscoveryInProgress=false;
 	Connection=false;
 	CurrentDeviceAddress.clear();
+	DeviceNameList.clear();
 	QBluetoothLocalDevice* BlueToothLocalDevice = new QBluetoothLocalDevice();
 	BlueToothAdapterAddress = BlueToothLocalDevice->address();
 	BlueToothSocket = new QBluetoothSocket(QBluetoothServiceInfo::RfcommProtocol);//The Socket is of the rfcomm type
@@ -26,8 +27,11 @@ QObject(parent)
 	StartDeviceDiscovery();//Runs by default at the beginning
 }
 
-BlueTooth::~BlueTooth()
-{
+BlueTooth::~BlueTooth() {
+	if(DiscoveryInProgress)
+		BlueToothDiscovery->stop();
+	if(Connection)
+		Disconnect();
 }
 
 //Called to start a device discovery
@@ -69,6 +73,8 @@ void BlueTooth::DeviceDiscoveryErrorHandler(QBluetoothDeviceDiscoveryAgent::Erro
 
 //Retrieve the list of discovered device, note that this will consist only of devices found during the current discovery session
 void BlueTooth::ParseDeviceList() {
+	if(!DiscoveryInProgress)
+		return;			//Do nothing if there is no ongoing device discovery
 	BlueToothInfoList=BlueToothDiscovery->discoveredDevices();
 	QString Namefilterone=PLAUSIBLE_NAME_1;
 	QString Namefiltertwo=PLAUSIBLE_NAME_2;
@@ -76,8 +82,8 @@ void BlueTooth::ParseDeviceList() {
 	bool anydevicesfound=false;
 	foreach(const QBluetoothDeviceInfo &devinfo, BlueToothInfoList) {
 		devname=devinfo.name();//If the device name is plausible
-		if(!(QString::compare(devname,Namefilterone,Qt::CaseInsensitive))&&!(QString::compare(devname,Namefiltertwo,Qt::CaseInsensitive))) {
-			if(DeviceNameList.indexOf(QRegExp(devname))<0) {//The name was not previously in the list
+		if(devname.contains(Namefilterone)||devname.contains(Namefiltertwo)) {
+			if(!DeviceNameList.contains(devname)) {//The name was not previously in the list
 				qDebug() << endl << "Found Bluetooth device:" << devname << endl;//Print debug output for each new device as it is found
 			}
 			DeviceNameList << devname;//Put the name (as a string) into the list
@@ -109,8 +115,12 @@ QStringList* BlueTooth::GetDeviceNames(void){
 void BlueTooth::ConnectToDevice(int DeviceIndex){
 	if(DiscoveryInProgress)
 		StopDeviceDiscovery();//Don't try to discover whilst also trying to connect
-	BlueToothSocket->connectToService(BlueToothInfoList.at(DeviceIndex).address(),1,QIODevice::ReadWrite);//Open the device as read/write, port is hardcoded as 1?
-	CurrentDeviceAddress=BlueToothInfoList.at(DeviceIndex).address();
+	if(DeviceIndex<BlueToothInfoList.count()) {
+		BlueToothSocket->connectToService(BlueToothInfoList.at(DeviceIndex).address(),1,QIODevice::ReadWrite);//Open the device as read/write, port is hardcoded as 1?
+		CurrentDeviceAddress=BlueToothInfoList.at(DeviceIndex).address();
+	}
+	else
+		qDebug() << endl << "Error, device number" << DeviceIndex+1 << " Requested out of" << BlueToothInfoList.count() << "devices";
 }
 
 //Simple device disconnect, used as a slot to disconnect
@@ -129,7 +139,7 @@ void BlueTooth::HandleDeviceError(QBluetoothSocket::SocketError err){
 	bool attemptreconnect=false;
 	if(err!=-2) {//If there actually is an error
 		if(err==QBluetoothSocket::UnknownSocketError) {
-			qDebug() << endl << "Error: unknown Bluetooth socket" << endl;
+			qDebug() << endl << "Error: unknown Bluetooth socket (did you forget to pair the device?)" << endl;
 		}
 		else if(err==QBluetoothSocket::HostNotFoundError) {
 			qDebug() << endl << "Error: Bluetooth host not found" << endl;
