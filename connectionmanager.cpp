@@ -149,12 +149,12 @@ void connectionManager::connectionStateMachine() {
 		if(used_port->device_type!=BT)
 			timeval=internaltimestamp+INTERNAL_REQUEST_INTERVAL;
 		else {
-			//if(request_mask!=workingdatasample.channelmask)//The requested channels disagree with the last send channels
-			//	timeval=internaltimestamp+0.5;//Max rate of 2hz even if someone is thrashing the buttons
-			//else
+			if(request_mask!=workingdatasample.channelmask)//The requested channels disagree with the last send channels
+				timeval=internaltimestamp+0.5;//Max rate of 2hz even if someone is thrashing the buttons
+			else
 				timeval=internaltimestamp+65;
 		}
-		if(secondsSinceEpoch>internaltimestamp) {
+		if(secondsSinceEpoch>timeval) {
 			internaltimestamp=secondsSinceEpoch;
 			int requests;
 			if(used_port->device_type!=BT) 
@@ -250,7 +250,8 @@ qDebug() << endl << "cnt:" << (int)((quint8)readpacket[1]);
 							diff*=6.10e-8*workingdatasample.device_scale_factor;// Convert to volts (peak to peak)
 							diff=240.0*diff+exp(110000.0*diff*diff*diff*pow((cable_capacitance+200.0)/400.0,3));//Brute force match-> Mohm
 							diff*=1000.0;// Now in units of k ohm, matching equation models board as ~200pF
-							diff-=BOARD_IMPEDANCE;// This impedance is present already on the board
+							if(diff>BOARD_IMPEDANCE)
+								diff-=BOARD_IMPEDANCE;// This impedance is present already on the board
 							workingdatasample.rawquality[n]=workingdatasample.rawquality[n]*(1.0-GAIN_COEFFICIENT)+diff*GAIN_COEFFICIENT;
 							workingdatasample.quality[n]=CONVERT_GAIN*logf(workingdatasample.rawquality[n])+CONVERT_OFFSET;//display value
 						}
