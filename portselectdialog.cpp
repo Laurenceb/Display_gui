@@ -20,6 +20,7 @@ QDialog(parent)
 	radio_group->setExclusive(this);
 	//There is also a serialport defined in here, it is connected to the Open button. If the port is already open its closed first
 	the_port = new SerialPort(this);
+	the_bt = new BlueTooth(this);
 	//QDialogButtonBox *box = new QDialogButtonBox(QDialogButtonBox::Open, Qt::Horizontal, this);
 	m_button = new QPushButton("Connect", this);//Text changes to Reconnect if the currently selected port is already open
 	m_button->setGeometry(QRect(QPoint(100, 100),QSize(200, 50)));
@@ -59,13 +60,17 @@ QDialog(parent)
 	DeviceValueLabel->setFrameStyle(QFrame::Panel | QFrame::Sunken);
 	layout->addWidget(DeviceLabel);
 	layout->addWidget(DeviceValueLabel);
+	Tx_waiting=0;
+	numberofserialports=0;
 	connect(telem_channels_group, SIGNAL(buttonClicked(int)), this, SLOT(onButtonSelected(int)));
 	connect(telem_type_btn, SIGNAL(clicked()), this, SLOT(switchTelemType()));
 	connect(m_button, SIGNAL (released()), this, SLOT(onAccepted()));//When the button is pressed and released, this function is called
 	connect(&portTimer, SIGNAL(timeout()), this, SLOT(drawRadioButtons()));
-	connect(the_port, SIGNAL(error(unsigned)), this, SLOT(onSerialError(unsigned)));
+	connect(the_port, SIGNAL(error(unsigned)), this, SLOT(onSerialError(unsigned)));//This is the Serial error handling, Bluetooth error handler is built in
 	connect(the_port, SIGNAL(written()), this, SLOT(onWritten()));
+	connect(the_bt, SIGNAL(written()), this, SLOT(onWritten()));//Bt and Serial written signal handling is identical
 	connect(the_port, SIGNAL(portClosed()), this, SLOT(closeHandler()));//No need to emit the connectionlost signal if we know there is a port closure
+	connect(the_bt, SIGNAL(portClosed()), this, SLOT(closeHandler()));
 	connect(radio_group, SIGNAL(buttonClicked(int)), this, SLOT(onRadioSelected(int)));
 	connect(radio_group, SIGNAL(buttonReleased(int)), this, SLOT(onRadioSelected(int)));//For the connect/reconnect functionality
 	//setLayout(layout);
@@ -77,25 +82,36 @@ void PortSelectDialog::drawRadioButtons()
 	static int n=0;//Stores how many times we have run
 	static QString portnames=QString("");//Used to detected changed config
 	static QList<QSerialPortInfo> OldserialPortInfo;
-	if(the_port->isOpen())
-		return;			//No need to do anything if already connect, also this seems to break the port
+	static QStringList OldBluetoothNames;
+	if(the_port->isOpen() || the_bt->Connection)
+		return;			//No need to do anything if already connected, also this seems to break the port
 	//Find all the suitable serial ports and add appropriate buttons to the layout
 	QList<QSerialPortInfo> serialPortInfoList = QSerialPortInfo::availablePorts();
 	QString portstring=QString("");
-	if(!the_port->isOpen())	//See if a connection is open
-		portname="";		//Wipe this if we have lost the connection
+	portname="";			//Wipe the port name, if we have gotten this far then there cannot be a connection
 	foreach(const QSerialPortInfo &serialPortInfo, serialPortInfoList) {
 		portstring.append(serialPortInfo.portName());	//All names go onto the string
 		portstring.append(serialPortInfo.manufacturer());//Sometimes the additional info takes longer to update, so if this changes update
+	}
+	numberofserialports=serialPortInfoList.count();
+	//Next look for Bluetooth devices, these are also listed
+	the_bt->ParseDeviceList();	//Parses device list
+	QStringList* BlueToothNames=the_bt->GetDeviceNames();
+	foreach(const QString &Bt, *BlueToothNames) {
+		portstring.append(Bt);	//Also stick Bluetooth device names onto the string
 	}
 	if(!n || !( portstring == portnames ))	{//Only update at boot or if the serial port config changes
 		n=1;
         	QString name=QString("");//Save radio button position based upon the port name, and repopulate
 		int checked_id = radio_group->checkedId();
-		if(checked_id!=-1 && checked_id<OldserialPortInfo.count() ) {//A button selected
+		if(checked_id!=-1 && checked_id<OldserialPortInfo.count() ) {//A button selected that corresponds to a serial port on the old settings
 			name.append(OldserialPortInfo.at(checked_id).portName());//Get name from the old list
 		}
 		OldserialPortInfo=serialPortInfoList;//Store the old info for reference
+		if(checked_id!=-1 && (checked_id-OldserialPortInfo.count())<OldBluetoothNames.count()) {//A button is checked, and it could be a Bluetooth device
+			name.append(OldBluetoothNames.at(checked_id));
+		}
+		OldBluetoothNames=*BlueToothNames;//Store the old bluetooth info for reference
 		portnames = portstring;
 		// Delete all existing widgets from the radio button layout, if any.
 		if ( radio_layout != NULL )
@@ -114,7 +130,7 @@ void PortSelectDialog::drawRadioButtons()
 		} 
 		portnamelist.clear();
 		int i = 0;
-		qDebug() << QObject::tr("Port list: ");
+		qDebug() << QObject::tr("Port list: ");//First loop through the serial ports
 		foreach(const QSerialPortInfo &serialPortInfo, serialPortInfoList) {
 			qDebug() << endl
 			<< QObject::tr("Port: ") << serialPortInfo.portName() << endl
@@ -135,6 +151,17 @@ void PortSelectDialog::drawRadioButtons()
 				btn->setChecked(true);//If the port configuration changes, the ticked button will still be the one we are connected to (if connected)
 			}
 			portnamelist << serialPortInfo.portName();//Load the port names into the list of ports
+			radio_layout->addWidget(btn);
+			radio_group->addButton(btn);
+			radio_group->setId(btn, i++);
+		}
+		numberofserialports=i;			//Store number of serial ports for reference
+		foreach(const QString &Bt, *BlueToothNames) {//Then loop through the Bluetooth devices
+			QRadioButton *btn = new QRadioButton();
+			if(checked_id!=-1 && !QString::compare(Bt,name,Qt::CaseInsensitive)) {
+				btn->setChecked(true);//If the port configuration changes, the ticked button will still be the one we are connected to (if connected)
+			}
+			portnamelist << Bt;//Load the port names into the list of ports
 			radio_layout->addWidget(btn);
 			radio_group->addButton(btn);
 			radio_group->setId(btn, i++);
@@ -182,27 +209,34 @@ void PortSelectDialog::onSerialError(unsigned error_code)
 void PortSelectDialog::onAccepted()
 {
 	int checked_id = radio_group->checkedId();
+	int devicetype=NO_DEVICE;	//Nothing connected device type is type 0
 	if(checked_id == -1) return;
 	QList<QSerialPortInfo> ports = QSerialPortInfo::availablePorts();//Use this to check the description of the selected port
 	//qDebug() << "openDevice" << ports.at(checked_id).portName();
 	//emit openDevice(ports.at(checked_id).portName());
-	portname=portnamelist.at(checked_id);//Store this for future reference, name of the current port
 	if(the_port->isOpen()) {//Close the port if it is open, before reopening after setting the name
 		the_port->close();
 	}
-	the_port->setName(portname);
-	the_port->open();
-	QString sp1ml=QString(SP1ML_DEVICE_DESCRIPTOR);//Use this to test if the connected port is a SP1ML device (using CP2102)
-	QString cp2102=QString(CP2102_DEVICE_DESCRIPTOR);
-	QString rn42=QString(RN_42_DONGLE_DESCRIPTOR);//FTDI dongle with RN-42 on it
-	int devicetype=0;	//Normal device type is type 0
-	//The sp1ml device descriptor (defined in the header), is part of this device descriptor
-	if(ports.at(checked_id).description().contains(cp2102) || ports.at(checked_id).description().contains(sp1ml)) {
-		devicetype=1;	//Type 1 is the SP1ML, currently three types, basic serial (0), SP1ML (1), and RN-42 dongle (2)
+	if(checked_id<numberofserialports) {//We have to open a Serial device
+		portname=portnamelist.at(checked_id);//Store this for future reference, name of the current port
+		the_port->setName(portname);
+		the_port->open();
+		QString sp1ml=QString(SP1ML_DEVICE_DESCRIPTOR);//Use this to test if the connected port is a SP1ML device (using CP2102)
+		QString cp2102=QString(CP2102_DEVICE_DESCRIPTOR);
+		QString rn42=QString(RN_42_DONGLE_DESCRIPTOR);//FTDI dongle with RN-42 on it
+		//The sp1ml device descriptor (defined in the header), is part of this device descriptor
+		if(ports.at(checked_id).description().contains(cp2102) || ports.at(checked_id).description().contains(sp1ml)) {
+			devicetype=SP1ML;	//Type 1 is the SP1ML, currently three types, basic serial (0), SP1ML (1), and RN-42 dongle (2)
+		}
+		if(ports.at(checked_id).description().contains(rn42)) {
+			devicetype=RN42;	//Type 2 is the RN42 dongle (Currently the extended functionality such as Inquiry scan is unsupported)
+			//the_port->setKeepOpen(false);//This should be set false to avoid io errors on rfcomm devices 
+		}
 	}
-	if(ports.at(checked_id).description().contains(rn42)) {
-		devicetype=2;	//Type 2 is the RN42 dongle
-		the_port->setKeepOpen(false);//This should be set false to avoid io errors on rfcomm devices 
+	else {		//This is a bluetooth connection
+		devicetype=BT;
+		checked_id-=numberofserialports;//Number of the bluetooth device according to the bluetooth numbering scheme
+		the_bt->ConnectToDevice(checked_id);
 	}
 	m_button->setText("Connected (click to reconnect)");	
 	emit newConnection(devicetype);
@@ -212,6 +246,10 @@ void PortSelectDialog::onAccepted()
 void PortSelectDialog::txDataWrite(QByteArray * byteArray) {
 	if(the_port->isOpen()) {
 		the_port->writeBytes(byteArray);
+		Tx_waiting=1;
+	}
+	else if(the_bt->Connection) {
+		the_bt->writeBytes(byteArray);
 		Tx_waiting=1;
 	}
 }
@@ -236,13 +274,21 @@ void PortSelectDialog::setDTR(bool DTR)//Currently unused, as pin is not broken 
 }
 
 void PortSelectDialog::emptyRxBuffer(void) {//Empties the Rx buffer, only use if really essential, so as to 
-	QByteArray arr=the_port->port->readAll();
-	//qDebug() << "," << arr.count() << ",";
-	for(int i=0; i<arr.count(); i++) {//Loop through the character array, placing all received characters into the queue
-		the_port->queue_.enqueue(arr.at(i));
+	if(the_port->isOpen()) {
+		QByteArray arr=the_port->port->readAll();
+		//qDebug() << "," << arr.count() << ",";
+		for(int i=0; i<arr.count(); i++) {//Loop through the character array, placing all received characters into the queue
+			the_port->queue_.enqueue(arr.at(i));
+		}
+		while(!(the_port->queue_.isEmpty())) {
+			the_port->queue_.dequeue();//Dump the data and do nothing with it
+		}
 	}
-	while(!(the_port->queue_.isEmpty())) {
-		the_port->queue_.dequeue();//Dump the data and do nothing with it
+	else if(the_bt->Connection) {
+		the_bt->ReceiveAvailableData();
+		while(!(the_bt->queue_.isEmpty())) {
+			the_bt->queue_.dequeue();//Dump the data and do nothing with it
+		}	
 	}
 }
 
@@ -250,7 +296,12 @@ void PortSelectDialog::readAsString(QByteArray* data) {
 	//while(!(the_port->queue_.isEmpty())) {
 	//	data->append(the_port->queue_.dequeue());//Dump the data and put it into the string
 	//}
-	data->append(the_port->port->readAll());
+	if(the_port->isOpen())
+		data->append(the_port->port->readAll());
+	else if(the_bt->Connection) {
+		while(!(the_bt->queue_.isEmpty()))
+			data->append(the_bt->queue_.dequeue());
+	}
 }
 
 /*void PortSelectDialog::emptyRxBuffer(void) {

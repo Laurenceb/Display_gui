@@ -355,10 +355,10 @@ void connectionManager::newConnection(int type) {
 	connection=true;
 	connectiontype=type;
 	emit setRTS(true);	//RTS to logic 1==normal mode. Init as normal mode (SP1ML will init from its EEPROM)
-	if(type==1)//^ It is not clear why the levels need to be as above (seems to be inverted?)
+	if(type==SP1ML)//^ It is not clear why the levels need to be as above (seems to be inverted? - From xperiments seems API logic levels are == TTL levels)
 		state=INIT_STATE_SP1ML;//Reset the state as appropriate
 	else {
-		state=INIT_STATE_RN42;
+		state=INIT_STATE_RN42;//Note that in future if RN42 via usb-serial dongle is added, another entry state may be needed to allow for Inquiry scanning
 		connectedDeviceName=QByteArray("Bluetooth or serial device");//Process the device name (this is used to update the GUI)
 		emit setDeviceDescriptor(&connectedDeviceName);
 	}

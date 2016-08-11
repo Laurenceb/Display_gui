@@ -6,6 +6,7 @@
 
 QT       += core gui
 QT += serialport
+QT += bluetooth
 
 greaterThan(QT_MAJOR_VERSION, 4): QT += widgets
 
@@ -22,7 +23,8 @@ SOURCES += qcustomplot.cpp \
     portselectdialog.cpp \
     connectionmanager.cpp \
     fileselectdialog.cpp \
-    BPMestimator.cpp
+    BPMestimator.cpp \
+    bluetooth.cpp
 
 HEADERS  += qcustomplot.h \
     tabdialog.h \
@@ -32,7 +34,8 @@ HEADERS  += qcustomplot.h \
     serialport.h \
     connectionmanager.h \
     fileselectdialog.h \
-    BPMestimator.h
+    BPMestimator.h \
+    bluetooth.h
 
 FORMS += \
     mainwindow.ui
