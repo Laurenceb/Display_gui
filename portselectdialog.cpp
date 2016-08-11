@@ -62,6 +62,7 @@ QDialog(parent)
 	layout->addWidget(DeviceValueLabel);
 	Tx_waiting=0;
 	numberofserialports=0;
+	device_type=NO_DEVICE;	//Nothing connected device type is type 0
 	connect(telem_channels_group, SIGNAL(buttonClicked(int)), this, SLOT(onButtonSelected(int)));
 	connect(telem_type_btn, SIGNAL(clicked()), this, SLOT(switchTelemType()));
 	connect(m_button, SIGNAL (released()), this, SLOT(onAccepted()));//When the button is pressed and released, this function is called
@@ -209,7 +210,6 @@ void PortSelectDialog::onSerialError(unsigned error_code)
 void PortSelectDialog::onAccepted()
 {
 	int checked_id = radio_group->checkedId();
-	int devicetype=NO_DEVICE;	//Nothing connected device type is type 0
 	if(checked_id == -1) return;
 	QList<QSerialPortInfo> ports = QSerialPortInfo::availablePorts();//Use this to check the description of the selected port
 	//qDebug() << "openDevice" << ports.at(checked_id).portName();
@@ -227,20 +227,20 @@ void PortSelectDialog::onAccepted()
 		QString rn42=QString(RN_42_DONGLE_DESCRIPTOR);//FTDI dongle with RN-42 on it
 		//The sp1ml device descriptor (defined in the header), is part of this device descriptor
 		if(ports.at(checked_id).description().contains(cp2102) || ports.at(checked_id).description().contains(sp1ml)) {
-			devicetype=SP1ML;	//Type 1 is the SP1ML, currently three types, basic serial (0), SP1ML (1), and RN-42 dongle (2)
+			device_type=SP1ML;	//Type 1 is the SP1ML, currently three types, basic serial (0), SP1ML (1), and RN-42 dongle (2)
 		}
 		if(ports.at(checked_id).description().contains(rn42)) {
-			devicetype=RN42;	//Type 2 is the RN42 dongle (Currently the extended functionality such as Inquiry scan is unsupported)
+			device_type=RN42;	//Type 2 is the RN42 dongle (Currently the extended functionality such as Inquiry scan is unsupported)
 			//the_port->setKeepOpen(false);//This should be set false to avoid io errors on rfcomm devices 
 		}
 	}
 	else {		//This is a bluetooth connection
-		devicetype=BT;
+		device_type=BT;
 		checked_id-=numberofserialports;//Number of the bluetooth device according to the bluetooth numbering scheme
 		the_bt->ConnectToDevice(checked_id);
 	}
 	m_button->setText("Connected (click to reconnect)");	
-	emit newConnection(devicetype);
+	emit newConnection(device_type);
 }
 
 //A high level function to accept signal from graph draw to write data

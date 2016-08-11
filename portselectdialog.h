@@ -28,6 +28,7 @@ class PortSelectDialog : public QDialog
 		SerialPort* the_port;	//Can access the buffer in here to get at the incoming data, check its connected first
 		BlueTooth* the_bt;	//Bluetooth class
 		bool Tx_waiting;	//This is used to check that written data has actually been sent. Note that whilst using QBluetooth it will always be false
+		quint8 device_type;	//The type of device that is connected at present
 		signals:
 		 //void openDevice(QString port_name);
 		 void newConnection(int devicetype);//Emitted when a new connection is made and we need to restart the connection manager state machine (type 1==SP1)

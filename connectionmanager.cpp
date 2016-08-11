@@ -11,7 +11,7 @@
 connectionManager::connectionManager(QObject *parent ,PortSelectDialog* used_port_) :
 QObject(parent)
 {
-	PortSelectDialog* used_port=used_port_;
+	used_port=used_port_;
 	//Connect all the signals and slots to the PortSelectDialog interface
 	connect(used_port, SIGNAL(newConnection(int)), this, SLOT(newConnection(int)));//A new connection, atm only 2 types supported, type 1 is an SP1ML dongle 
 	connect(used_port, SIGNAL(connectionLost()), this, SLOT(lostConnection()));//A disconnection
@@ -144,9 +144,23 @@ void connectionManager::connectionStateMachine() {
 		currentestimateddevicetime=secondsSinceEpoch;//All these are reset to defaults
 		state=ENTRY_STATE+1;		//Continue straight into the next state once these static variables have been set
 	case ENTRY_STATE+1:
+		{//context
+		double timeval;
+		if(used_port->device_type!=BT)
+			timeval=internaltimestamp+INTERNAL_REQUEST_INTERVAL;
+		else {
+			//if(request_mask!=workingdatasample.channelmask)//The requested channels disagree with the last send channels
+			//	timeval=internaltimestamp+0.5;//Max rate of 2hz even if someone is thrashing the buttons
+			//else
+				timeval=internaltimestamp+65;
+		}
 		if(secondsSinceEpoch>internaltimestamp) {
-			internaltimestamp=secondsSinceEpoch+INTERNAL_REQUEST_INTERVAL;
-			int requests=(int)(DATA_RATE*INTERNAL_REQUEST_INTERVAL*DATA_OVER_REQUEST);//Number of samples to request
+			internaltimestamp=secondsSinceEpoch;
+			int requests;
+			if(used_port->device_type!=BT) 
+				requests=(int)(DATA_RATE*INTERNAL_REQUEST_INTERVAL*DATA_OVER_REQUEST);//Number of samples to request
+			else
+				requests=255;	//BT doesnt have a transmit packet timeout (0xFF request lasts forever)
 			transmitbuffer.clear();
 			if(!operatingmode)	//Normal auxillary channel mode
 				transmitbuffer.append(PACKET_HEAD"3");//Message type 3 is a request
@@ -157,6 +171,7 @@ void connectionManager::connectionStateMachine() {
 			emit sendData(&transmitbuffer);
 			//qDebug() << endl << "#" << fmod(secondsSinceEpoch,100.0);
 		}
+		}//context
 		internaltimeout--;
 		emit readAsString(&receivebuffer);
 		QByteArray readpacket;
