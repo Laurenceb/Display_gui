@@ -209,6 +209,7 @@ void PortSelectDialog::onSerialError(unsigned error_code)
 
 void PortSelectDialog::onAccepted()
 {
+	bool connectedok=false;
 	int checked_id = radio_group->checkedId();
 	if(checked_id == -1) return;
 	QList<QSerialPortInfo> ports = QSerialPortInfo::availablePorts();//Use this to check the description of the selected port
@@ -233,14 +234,17 @@ void PortSelectDialog::onAccepted()
 			device_type=RN42;	//Type 2 is the RN42 dongle (Currently the extended functionality such as Inquiry scan is unsupported)
 			//the_port->setKeepOpen(false);//This should be set false to avoid io errors on rfcomm devices 
 		}
+		connectedok=true;
 	}
 	else {		//This is a bluetooth connection
 		device_type=BT;
 		checked_id-=numberofserialports;//Number of the bluetooth device according to the bluetooth numbering scheme
-		the_bt->ConnectToDevice(checked_id);
+		connectedok=the_bt->ConnectToDevice(checked_id);
 	}
-	m_button->setText("Connected (click to reconnect)");	
-	emit newConnection(device_type);
+	if(connectedok) {
+		m_button->setText("Connected (click to reconnect)");	
+		emit newConnection(device_type);
+	}
 }
 
 //A high level function to accept signal from graph draw to write data

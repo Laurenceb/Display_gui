@@ -75,33 +75,28 @@ void BlueTooth::DeviceDiscoveryErrorHandler(QBluetoothDeviceDiscoveryAgent::Erro
 void BlueTooth::ParseDeviceList() {
 	if(!DiscoveryInProgress)
 		return;			//Do nothing if there is no ongoing device discovery
-	BlueToothInfoList=BlueToothDiscovery->discoveredDevices();
+	QList<QBluetoothDeviceInfo> newfounddevicelist=BlueToothDiscovery->discoveredDevices();//Any new devices
 	QString Namefilterone=PLAUSIBLE_NAME_1;
 	QString Namefiltertwo=PLAUSIBLE_NAME_2;
 	QString devname;
-	bool anydevicesfound=false;
-	foreach(const QBluetoothDeviceInfo &devinfo, BlueToothInfoList) {
+	quint64 devaddr;
+	foreach(const QBluetoothDeviceInfo &devinfo, newfounddevicelist) {//Loop through all the devices in the infolist
 		devname=devinfo.name();//If the device name is plausible
-		if(devname.contains(Namefilterone)||devname.contains(Namefiltertwo)) {
-			if(!DeviceNameList.contains(devname)) {//The name was not previously in the list
+		devaddr=devinfo.address().toUInt64();
+		if((devname.contains(Namefilterone)||devname.contains(Namefiltertwo))&&!DeviceNameList.contains(devname)) {//Name was not in the list
+			if(!BlueToothAddresses.contains(devaddr)) {//Also a new address
 				qDebug() << endl << "Found Bluetooth device:" << devname << endl;//Print debug output for each new device as it is found
+				DeviceNameList << devname;//Put the name (as a string) into the list
+				BlueToothInfoList << devinfo;
+				BlueToothAddresses << devaddr;
 			}
-			DeviceNameList << devname;//Put the name (as a string) into the list
-			anydevicesfound=true;
-		}
-	}
-	if(anydevicesfound) {
-		DeviceNameList.removeDuplicates();//This removes any duplicate names from the name list. Note that name list consists of all uniques since gui started
-		QList<QBluetoothDeviceInfo> BlueToothInfoList_=BlueToothInfoList;//Copy the list to a new temporary copy before we repopulate it
-		BlueToothInfoList.clear();
-		int n;
-		QStringList q;
-		foreach(const QBluetoothDeviceInfo &devinfo, BlueToothInfoList_) {
-			q << devinfo.name();//names of the current devices in the order that they appear
-		}
-		foreach(const QString &dev_name, DeviceNameList) {//Now loop through the sorted device name list and populate the list of descriptors
-			n=q.indexOf(QRegExp(dev_name));//Index of this name in the old name list
-			BlueToothInfoList << BlueToothInfoList_.at(n);//BlueToothInfoList now has the same order as DeviceNameList
+			else {//the name of a device was changed
+				int ind=BlueToothAddresses.indexOf(devaddr);
+				qDebug() << endl << "Namechange to:" << devname << endl;
+				BlueToothInfoList[ind]=devinfo;
+				BlueToothAddresses[ind]=devaddr;
+				DeviceNameList[ind]=devname;
+			}
 		}
 	}
 }
@@ -112,15 +107,19 @@ QStringList* BlueTooth::GetDeviceNames(void){
 }
 
 //Connects to a device, the DeviceIndex is the number of the device as an index to the list of devices
-void BlueTooth::ConnectToDevice(int DeviceIndex){
+bool BlueTooth::ConnectToDevice(int DeviceIndex){
 	if(DiscoveryInProgress)
 		StopDeviceDiscovery();//Don't try to discover whilst also trying to connect
 	if(DeviceIndex<BlueToothInfoList.count()) {
 		BlueToothSocket->connectToService(BlueToothInfoList.at(DeviceIndex).address(),1,QIODevice::ReadWrite);//Open the device as read/write, port is hardcoded as 1?
 		CurrentDeviceAddress=BlueToothInfoList.at(DeviceIndex).address();
+		return true;
 	}
-	else
+	else {
 		qDebug() << endl << "Error, device number" << DeviceIndex+1 << " Requested out of" << BlueToothInfoList.count() << "devices";
+		StartDeviceDiscovery();//Turn the device discovery back on
+		return false;
+	}
 }
 
 //Simple device disconnect, used as a slot to disconnect

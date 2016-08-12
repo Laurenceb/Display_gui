@@ -28,7 +28,7 @@ class BlueTooth : public QObject
 		void writeBytes(QByteArray * byteArray);//Writes to connected device
 		void ReceiveAvailableData(void);
 		QStringList* GetDeviceNames(); //Retreive the list of device names, called by the portselectdialog to update the list of icons
-		void ConnectToDevice(int n);	//Connect to a device, use the index into the list of device to identify the device to connect to
+		bool ConnectToDevice(int n);	//Connect to a device, use the index into the list of device to identify the device to connect to
 		void Disconnect(void);		//Disconnect from a connected device
 		signals:
 		 void error(unsigned error_code);//When an error occurs _during a connection_
@@ -49,5 +49,6 @@ class BlueTooth : public QObject
 		bool Attempt_Reconnection;	//Try to reconnect to the device if it has failed
 		QBluetoothAddress CurrentDeviceAddress;	//Address of the current connection target
 		QList<QBluetoothDeviceInfo> BlueToothInfoList;//List of full device descriptors, note that this should be in the same order to allow simpler indexing
+		QList<quint64> BlueToothAddresses;
 };
 #endif // BLUETOOTH_H
