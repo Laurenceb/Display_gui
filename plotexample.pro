@@ -12,7 +12,7 @@ greaterThan(QT_MAJOR_VERSION, 4): QT += widgets
 
 TARGET = plotexample
 TEMPLATE = app
-
+RC_FILE = myapp.rc
 
 SOURCES += qcustomplot.cpp \
     tabdialog.cpp \
