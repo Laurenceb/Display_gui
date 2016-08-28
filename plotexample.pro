@@ -14,6 +14,10 @@ TARGET = plotexample
 TEMPLATE = app
 RC_FILE = myapp.rc
 
+win32 {
+  QMAKE_LFLAGS += -static-libgcc -static-libstdc++
+}
+
 SOURCES += qcustomplot.cpp \
     tabdialog.cpp \
     graph.cpp \
